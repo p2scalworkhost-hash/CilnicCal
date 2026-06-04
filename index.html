@@ -1161,6 +1161,12 @@
         }
 
         async function parseLabTextWithLLM(ocrText, fileName) {
+            let docHint = '';
+            if (doctorRows && doctorRows.length > 0) {
+                const docNames = [...new Set(doctorRows.map(r => r.doctor).filter(Boolean))];
+                docHint = `\n\nรายชื่อทันตแพทย์ที่ถูกต้องในระบบคลินิกสำหรับอ้างอิงและแก้ไขตัวสะกดที่เพี้ยนจาก OCR:\n${JSON.stringify(docNames)}\n*สำคัญมาก: หากชื่อที่อ่านได้จาก OCR มีการสะกดผิดเพี้ยนจากรายชื่อแพทย์ในคลินิกข้างต้นเพียงเล็กน้อย (เช่น สระอุ/สระอู สลับกัน, ตัวการันต์ตกหล่น เช่น 'สูรศักดิ์' -> 'สุรศักดิ์') ให้แก้ชื่อแพทย์คนนั้นใน JSON ให้สะกดตรงตามรายชื่อแพทย์ที่ถูกต้องข้างต้นทันที*`;
+            }
+
             const systemPrompt = `คุณเป็น AI ที่เชี่ยวชาญในการแกะข้อมูลจากใบวางบิลค่าแลปทันตกรรม (Dental Lab Invoice)
 จากข้อความ OCR ที่ให้มา ให้แกะข้อมูลต่อไปนี้ออกมาเป็น JSON array:
 
@@ -1177,7 +1183,7 @@
 2. ถ้ามีหมอหลายคนในใบเดียว ให้แยกเป็นหลายรายการ
 3. ยอดเงินต้องเป็นตัวเลข (number) ไม่ใช่ string
 4. ถ้าอ่านข้อมูลไม่ได้ชัดเจน ให้ใส่ค่าที่เป็นไปได้มากที่สุด
-5. ถ้าชื่อสาขามีคำว่า "สาขา" ให้ดึงเฉพาะส่วนหลังคำว่า "สาขา" เช่น "คลินิกฯ สาขาซอยมังกร" → branch = "สาขาซอยมังกร"`;
+5. ถ้าชื่อสาขามีคำว่า "สาขา" ให้ดึงเฉพาะส่วนหลังคำว่า "สาขา" เช่น "คลินิกฯ สาขาซอยมังกร" → branch = "สาขาซอยมังกร"${docHint}`;
 
             const response = await fetchWithRetry(() => fetch(TYPHOON_LLM_URL, {
                 method: 'POST',
@@ -1485,6 +1491,32 @@
             return parts.length > 0 ? parts[0].toLowerCase() : s.toLowerCase();
         }
 
+        function levenshteinDistance(a, b) {
+            const matrix = [];
+            for (let i = 0; i <= b.length; i++) matrix[i] = [i];
+            for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+            for (let i = 1; i <= b.length; i++) {
+                for (let j = 1; j <= a.length; j++) {
+                    if (b.charAt(i - 1) === a.charAt(j - 1)) {
+                        matrix[i][j] = matrix[i - 1][j - 1];
+                    } else {
+                        matrix[i][j] = Math.min(
+                            matrix[i - 1][j - 1] + 1, // substitution
+                            matrix[i][j - 1] + 1,     // insertion
+                            matrix[i - 1][j] + 1      // deletion
+                        );
+                    }
+                }
+            }
+            return matrix[b.length][a.length];
+        }
+
+        function stripThaiVowelsAndTones(str) {
+            return String(str ?? '')
+                .replace(/[\u0e30-\u0e3a\u0e47-\u0e4e]/g, '') // remove vowels above/below and tones/diacritics
+                .trim();
+        }
+
         function applyLabToDoctors() {
             if (!doctorRows.length) return;
 
@@ -1544,6 +1576,51 @@
                         if (normDoc.length >= 2 && labKey.includes(normDoc)) {
                             matchedDoctor = docName;
                             break;
+                        }
+                    }
+                }
+
+                // 4) Fallback: Consonant skeleton exact match (ละเว้นสระบน/ล่าง และวรรณยุกต์)
+                if (!matchedDoctor) {
+                    const sampleLab = labRows.find(x => normalizeDoctorName(x.doctor) === labKey);
+                    if (sampleLab) {
+                        const labCore = extractCoreName(sampleLab.doctor);
+                        const strippedLabCore = stripThaiVowelsAndTones(labCore);
+                        if (strippedLabCore && strippedLabCore.length >= 2) {
+                            for (const [coreDoc, docName] of doctorCoreMap.entries()) {
+                                const strippedDocCore = stripThaiVowelsAndTones(coreDoc);
+                                if (strippedLabCore === strippedDocCore) {
+                                    matchedDoctor = docName;
+                                    console.log(`Fuzzy matched (Consonant skeleton): "${labCore}" -> "${matchedDoctor}"`);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 5) Fallback: Levenshtein distance on core names — ตัวสะกดผิดเพี้ยนเล็กน้อย (distance <= 2)
+                if (!matchedDoctor) {
+                    const sampleLab = labRows.find(x => normalizeDoctorName(x.doctor) === labKey);
+                    if (sampleLab) {
+                        const labCore = extractCoreName(sampleLab.doctor);
+                        if (labCore && labCore.length >= 2) {
+                            let bestMatch = null;
+                            let minDistance = 999;
+                            for (const [coreDoc, docName] of doctorCoreMap.entries()) {
+                                const dist = levenshteinDistance(labCore, coreDoc);
+                                if (dist <= 2 && dist < minDistance) {
+                                    const maxLen = Math.max(labCore.length, coreDoc.length);
+                                    if (maxLen > 0 && (maxLen - dist) / maxLen >= 0.8) {
+                                        minDistance = dist;
+                                        bestMatch = docName;
+                                    }
+                                }
+                            }
+                            if (bestMatch) {
+                                matchedDoctor = bestMatch;
+                                console.log(`Fuzzy matched (Levenshtein on core names): "${labCore}" -> "${matchedDoctor}" (distance: ${minDistance})`);
+                            }
                         }
                     }
                 }
@@ -1635,7 +1712,7 @@
             if (s.includes('สะพานสี่') || s.includes('สาขา3') || s.includes('branch3')) return 'สาขา 3';
             if (s.includes('แหลมฉบัง') || s.includes('สาขา2') || s.includes('branch2')) return 'สาขา 2';
             
-            if (s.includes('สาขา1') || s.includes('branch1')) return 'สาขา 1';
+            if (s.includes('ชลบุรี') || s.includes('chonburi') || s.includes('สาขา1') || s.includes('branch1')) return 'สาขา 1';
             
             if (s.includes('หมอฟันคู่ใจ')) {
                 if (s.includes('2')) return 'สาขา 2';
