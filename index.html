@@ -1612,6 +1612,13 @@
                 }
             }
 
+            // เรียงลำดับสาขาตามหมายเลข (สาขา 1, 2, 3, ...)
+            branchNames.sort((a, b) => {
+                const na = parseInt((a.match(/\d+/) || [999])[0]);
+                const nb = parseInt((b.match(/\d+/) || [999])[0]);
+                return na - nb;
+            });
+
             buildDoctorSummary();
             applyLabToDoctors();
             renderAll();
