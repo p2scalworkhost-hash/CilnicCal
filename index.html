@@ -1,0 +1,2053 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MedIQ Link - ระบบสรุปรายได้ทันตแพทย์ 6 สาขา</title>
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Noto+Sans+Thai:wght@300;400;500;600;700;800&display=swap');
+
+        :root {
+            --primary: #0f766e;
+            --primary-light: #14b8a6;
+            --primary-rgb: 15, 118, 110;
+            --primary-gradient: linear-gradient(135deg, #0f766e 0%, #1e3a8a 100%);
+            --accent-gradient: linear-gradient(135deg, #3b82f6 0%, #4f46e5 100%);
+            
+            --success: #059669;
+            --success-bg: #ecfdf5;
+            --danger: #dc2626;
+            --danger-bg: #fef2f2;
+            
+            --neutral-50: #f8fafc;
+            --neutral-100: #f1f5f9;
+            --neutral-200: #e2e8f0;
+            --neutral-300: #cbd5e1;
+            --neutral-400: #94a3b8;
+            --neutral-600: #475569;
+            --neutral-700: #334155;
+            --neutral-800: #1e293b;
+            --neutral-900: #0f172a;
+            
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 18px;
+            --radius-xl: 24px;
+            
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+            --shadow-lg: 0 10px 15px -3px rgba(15, 23, 42, 0.05), 0 4px 6px -2px rgba(15, 23, 42, 0.03);
+            --shadow-xl: 0 20px 25px -5px rgba(15, 23, 42, 0.08), 0 10px 10px -5px rgba(15, 23, 42, 0.04);
+            
+            --glass-bg: rgba(255, 255, 255, 0.8);
+            --glass-border: rgba(255, 255, 255, 0.6);
+            --glass-shadow: 0 8px 32px 0 rgba(15, 23, 42, 0.06);
+        }
+
+        * {
+            box-sizing: border-box;
+            transition: background-color 0.2s, border-color 0.2s, box-shadow 0.2s;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Inter', 'Noto Sans Thai', sans-serif;
+            background: radial-gradient(circle at 10% 20%, #f0f4f8 0%, #e2e8f0 100%);
+            background-attachment: fixed;
+            color: var(--neutral-800);
+            min-height: 100vh;
+            line-height: 1.5;
+        }
+
+        .wrap {
+            max-width: 1440px;
+            margin: 0 auto;
+            padding: 32px 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        /* Hero / Header Section */
+        .hero {
+            background: var(--primary-gradient);
+            color: #fff;
+            padding: 40px;
+            border-radius: var(--radius-xl);
+            box-shadow: var(--shadow-xl);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 24px;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.06) 0%, transparent 60%);
+            pointer-events: none;
+        }
+
+        .hero-content {
+            z-index: 1;
+            max-width: 800px;
+        }
+
+        .hero h1 {
+            margin: 0 0 12px;
+            font-size: 32px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .hero h1 svg {
+            width: 36px;
+            height: 36px;
+            fill: currentColor;
+            animation: pulse-slow 3s infinite ease-in-out;
+        }
+
+        .hero p {
+            margin: 0;
+            font-size: 16px;
+            color: rgba(255, 255, 255, 0.85);
+            line-height: 1.6;
+            font-weight: 400;
+        }
+
+        /* Glassmorphic Panel Base */
+        .panel {
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-lg);
+            padding: 28px;
+            box-shadow: var(--glass-shadow);
+        }
+
+        /* Upload Container & Dropzone */
+        .upload-box {
+            border: 2px dashed #93c5fd;
+            background: rgba(239, 246, 255, 0.5);
+            border-radius: var(--radius-md);
+            padding: 36px 24px;
+            text-align: center;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .upload-box:hover, .upload-box.dragover {
+            border-color: var(--primary-light);
+            background: rgba(239, 246, 255, 0.8);
+            box-shadow: 0 0 0 4px rgba(20, 184, 166, 0.15);
+        }
+
+        .upload-box strong {
+            display: block;
+            font-size: 18px;
+            color: var(--neutral-900);
+            margin-bottom: 8px;
+        }
+
+        .upload-box svg.cloud-icon {
+            width: 64px;
+            height: 64px;
+            margin: 0 auto 16px;
+            color: #3b82f6;
+        }
+
+        /* File Chips */
+        .file-chips-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 20px;
+            max-width: 100%;
+        }
+
+        .file-chip {
+            background: #fff;
+            border: 1px solid var(--neutral-200);
+            border-radius: 999px;
+            padding: 6px 14px;
+            font-size: 13px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .file-chip svg {
+            width: 16px;
+            height: 16px;
+            color: var(--primary);
+        }
+
+        .file-chip .file-size {
+            color: var(--neutral-400);
+            font-size: 11px;
+        }
+
+        input[type="file"] {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        /* Buttons & Actions */
+        .actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 20px;
+            position: relative;
+            z-index: 10;
+        }
+
+        button {
+            border: 0;
+            border-radius: 999px;
+            padding: 12px 24px;
+            background: var(--primary-gradient);
+            color: white;
+            font-weight: 600;
+            font-size: 14px;
+            letter-spacing: 0.2px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 4px 14px 0 rgba(15, 118, 110, 0.25);
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px 0 rgba(15, 118, 110, 0.35);
+            filter: brightness(1.1);
+        }
+
+        button:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        button.secondary {
+            background: #fff;
+            color: var(--neutral-700);
+            border: 1px solid var(--neutral-200);
+            box-shadow: var(--shadow-sm);
+        }
+
+        button.secondary:hover:not(:disabled) {
+            background: var(--neutral-50);
+            box-shadow: var(--shadow-md);
+            color: var(--neutral-900);
+        }
+
+        button.warn {
+            background: var(--accent-gradient);
+            box-shadow: 0 4px 14px 0 rgba(59, 130, 246, 0.25);
+        }
+
+        button:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+            box-shadow: none !important;
+            transform: none !important;
+        }
+
+        .status {
+            margin-top: 16px;
+            color: var(--neutral-600);
+            font-size: 14px;
+            padding: 10px 16px;
+            border-radius: var(--radius-sm);
+            background: rgba(255, 255, 255, 0.6);
+            display: inline-block;
+            max-width: 90%;
+            box-shadow: var(--shadow-sm);
+        }
+
+        /* KPI Summary Grid */
+        .cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+            gap: 20px;
+        }
+
+        .card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-radius: var(--radius-lg);
+            padding: 22px;
+            border: 1px solid var(--glass-border);
+            box-shadow: var(--glass-shadow);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--shadow-xl);
+            border-color: rgba(15, 118, 110, 0.3);
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            background: var(--neutral-400);
+        }
+
+        .card.c-branches::before { background: #3b82f6; }
+        .card.c-doctors::before { background: #6366f1; }
+        .card.c-income::before { background: #10b981; }
+        .card.c-df::before { background: #f59e0b; }
+        .card.c-clinic::before { background: #06b6d4; }
+        .card.c-gross::before { background: #8b5cf6; }
+        .card.c-net::before { background: #e11d48; }
+
+        .card .card-header-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 12px;
+        }
+
+        .card .label {
+            color: var(--neutral-600);
+            font-size: 13px;
+            font-weight: 600;
+            line-height: 1.3;
+        }
+
+        .card .card-icon {
+            width: 24px;
+            height: 24px;
+            color: var(--neutral-400);
+            opacity: 0.8;
+        }
+
+        .card.c-branches .card-icon { color: #3b82f6; }
+        .card.c-doctors .card-icon { color: #6366f1; }
+        .card.c-income .card-icon { color: #10b981; }
+        .card.c-df .card-icon { color: #f59e0b; }
+        .card.c-clinic .card-icon { color: #06b6d4; }
+        .card.c-gross .card-icon { color: #8b5cf6; }
+        .card.c-net .card-icon { color: #e11d48; }
+
+        .card .value {
+            font-size: 26px;
+            font-weight: 800;
+            color: var(--neutral-900);
+            letter-spacing: -0.5px;
+            word-break: break-all;
+        }
+
+        /* Tabs Navigation */
+        .tabs {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            background: var(--neutral-100);
+            padding: 6px;
+            border-radius: 999px;
+            margin-bottom: 24px;
+            width: fit-content;
+        }
+
+        .tab {
+            background: transparent;
+            color: var(--neutral-600);
+            border-radius: 999px;
+            padding: 8px 20px;
+            font-size: 13px;
+            font-weight: 600;
+            box-shadow: none !important;
+            transform: none !important;
+        }
+
+        .tab:hover {
+            color: var(--neutral-900);
+            background: rgba(0, 0, 0, 0.03);
+        }
+
+        .tab.active {
+            background: #fff;
+            color: var(--primary);
+            box-shadow: var(--shadow-sm) !important;
+        }
+
+        /* Toolbar / Filters */
+        .toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .toolbar input,
+        .toolbar select {
+            padding: 10px 16px;
+            border: 1px solid var(--neutral-200);
+            border-radius: var(--radius-md);
+            min-width: 240px;
+            font-family: inherit;
+            font-size: 14px;
+            background: #fff;
+            outline: none;
+        }
+
+        .toolbar input:focus,
+        .toolbar select:focus {
+            border-color: var(--primary-light);
+            box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.15);
+        }
+
+        .toolbar button {
+            padding: 10px 20px;
+            font-size: 13px;
+        }
+
+        /* Table & Custom Inputs */
+        .table-wrap {
+            overflow: auto;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--neutral-200);
+            background: #fff;
+            box-shadow: var(--shadow-sm);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+            min-width: 1400px;
+        }
+
+        th,
+        td {
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--neutral-100);
+            text-align: right;
+            white-space: nowrap;
+        }
+
+        th {
+            background: var(--neutral-50);
+            color: var(--neutral-700);
+            font-weight: 700;
+            font-size: 13px;
+            position: sticky;
+            top: 0;
+            z-index: 5;
+        }
+
+        td:first-child,
+        th:first-child {
+            text-align: left;
+            position: sticky;
+            left: 0;
+            background: inherit;
+            z-index: 10;
+            font-weight: 600;
+            border-right: 1px solid var(--neutral-100);
+        }
+
+        th:first-child {
+            z-index: 15;
+            background: var(--neutral-50);
+        }
+
+        tr:hover td {
+            background: var(--neutral-50);
+        }
+
+        tr:last-child td {
+            border-bottom: 0;
+            background: var(--neutral-50) !important;
+            font-weight: 700;
+        }
+
+        .money {
+            font-variant-numeric: tabular-nums;
+            font-family: 'Inter', sans-serif;
+            font-weight: 500;
+        }
+
+        tr:last-child .money {
+            font-weight: 800;
+        }
+
+        /* Elegant inline table input */
+        .input-cell-wrapper {
+            display: inline-flex;
+            align-items: center;
+            border: 1px solid var(--neutral-200);
+            background: #fff;
+            border-radius: var(--radius-sm);
+            padding: 2px 6px;
+            width: 110px;
+            min-width: 110px;
+        }
+
+        .input-cell-wrapper:focus-within {
+            border-color: var(--primary-light);
+            box-shadow: 0 0 0 2px rgba(20, 184, 166, 0.15);
+        }
+
+        .input-cell {
+            width: 100%;
+            border: 0;
+            background: transparent;
+            padding: 4px;
+            text-align: right;
+            font-family: inherit;
+            font-weight: 600;
+            font-size: 13.5px;
+            color: var(--neutral-800);
+            outline: none;
+            -moz-appearance: textfield;
+        }
+
+        /* Hide spin buttons for Chrome, Safari, Edge, Opera */
+        .input-cell::-webkit-outer-spin-button,
+        .input-cell::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        /* Badges */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 10px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .badge.ok {
+            background: var(--success-bg);
+            color: var(--success);
+        }
+
+        .badge.bad {
+            background: var(--danger-bg);
+            color: var(--danger);
+        }
+
+        .muted {
+            color: var(--neutral-600);
+            font-size: 13.5px;
+            line-height: 1.5;
+        }
+
+        /* Help Modal (วิธีเตรียมไฟล์) */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(15, 23, 42, 0.4);
+            backdrop-filter: blur(8px);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            animation: fade-in 0.25s ease-out;
+        }
+
+        .modal-card {
+            background: #fff;
+            border-radius: var(--radius-xl);
+            max-width: 850px;
+            width: 100%;
+            box-shadow: var(--shadow-xl);
+            border: 1px solid var(--neutral-200);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            animation: slide-up 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .modal-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--neutral-200);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--neutral-50);
+        }
+
+        .modal-header h3 {
+            margin: 0;
+            font-size: 18px;
+            color: var(--neutral-900);
+            font-weight: 700;
+        }
+
+        .modal-close {
+            background: transparent;
+            border: 0;
+            font-size: 24px;
+            color: var(--neutral-400);
+            cursor: pointer;
+            padding: 4px;
+            line-height: 1;
+            box-shadow: none !important;
+            transform: none !important;
+        }
+
+        .modal-close:hover {
+            color: var(--neutral-900);
+        }
+
+        .modal-body {
+            padding: 24px;
+            overflow-y: auto;
+            max-height: 70vh;
+        }
+
+        /* Mock Excel table in Modal */
+        .mock-excel-table-wrap {
+            overflow: auto;
+            border: 1px solid var(--neutral-200);
+            border-radius: var(--radius-md);
+            margin: 16px 0;
+        }
+
+        .mock-excel-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+            min-width: 700px;
+        }
+
+        .mock-excel-table th, .mock-excel-table td {
+            padding: 8px 12px;
+            text-align: left;
+            border: 1px solid var(--neutral-200);
+            font-family: inherit;
+        }
+
+        .mock-excel-table th {
+            background: var(--neutral-100);
+            font-weight: 600;
+            color: var(--neutral-600);
+            text-align: center;
+        }
+
+        .mock-excel-table tr.header-row td {
+            background: #fdf2f8;
+            font-weight: 700;
+            color: #be185d;
+        }
+
+        .mock-excel-table tr.subheader-row td {
+            background: #f0fdf4;
+            font-weight: 600;
+            color: #15803d;
+        }
+
+        .mock-excel-table tr.footer-row td {
+            background: #eff6ff;
+            font-weight: 700;
+            color: #1d4ed8;
+        }
+
+        .mock-excel-table td.col-idx {
+            font-weight: 600;
+            background: var(--neutral-50);
+            text-align: center;
+            color: var(--neutral-400);
+            width: 120px;
+        }
+
+        .tips-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px;
+            margin-top: 20px;
+        }
+
+        .tip-item {
+            background: var(--neutral-50);
+            border-radius: var(--radius-md);
+            padding: 16px;
+            border: 1px solid var(--neutral-200);
+            font-size: 13px;
+        }
+
+        .tip-item strong {
+            display: block;
+            color: var(--neutral-900);
+            margin-bottom: 4px;
+        }
+
+        /* Animations */
+        @keyframes pulse-slow {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.08); opacity: 0.9; }
+        }
+
+        @keyframes fade-in {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slide-up {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        /* Responsive Breakpoints */
+        @media (max-width: 992px) {
+            .hero {
+                padding: 28px;
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .hero h1 {
+                font-size: 26px;
+            }
+
+            .cards {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .cards {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .wrap {
+                padding: 16px;
+            }
+            
+            .toolbar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .toolbar input, .toolbar select {
+                min-width: 100%;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .cards {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="wrap">
+        <!-- Header Branding -->
+        <section class="hero">
+            <div class="hero-content">
+                <h1>
+                    <svg viewBox="0 0 24 24">
+                        <path d="M19 3H5C3.9 3 3 3.9 3 5V19C3 20.1 3.9 21 5 21H19C20.1 21 21 20.1 21 19V5C21 3.9 20.1 3 19 3M19 19H5V5H19V19M17 12H14V9H10V12H7V16H10V19H14V16H17V12Z" />
+                    </svg>
+                    MedIQ Link
+                </h1>
+                <p>ระบบรวบรวมรายได้และประมวลผลทันตแพทย์เชื่อมโยง 6 สาขา ระบบจะสแกนหาหมวด Dentist Fee, ยอดรายได้คุณหมอ (Prov Share) ข้ามสาขา และจัดสัดส่วนหักค่าแลปและค่าเครื่องมือแพทย์ให้อัตโนมัติอย่างแม่นยำ</p>
+            </div>
+        </section>
+
+        <!-- Dropzone Box -->
+        <section class="panel">
+            <div class="upload-box" id="dropZone">
+                <svg class="cloud-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                </svg>
+                <strong>ลากและวางไฟล์ Excel สรุปรายได้สาขาที่นี่ หรือคลิกเพื่อเลือกไฟล์</strong>
+                <div class="muted">รองรับไฟล์ Excel (.xlsx, .xls) ได้หลายไฟล์พร้อมกัน เช่น สาขา1.xlsx, สาขา2.xlsx</div>
+                <input id="fileInput" type="file" multiple accept=".xlsx,.xls" />
+                
+                <!-- Processed list -->
+                <div class="file-chips-container" id="uploadedFilesList"></div>
+
+                <div class="actions" style="justify-content:center">
+                    <button onclick="processSelectedFiles()">
+                        <svg style="width:18px;height:18px" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2C6.5 2 2 6.5 2 12S6.5 22 12 22 22 17.5 22 12 17.5 2 12 2M12 20C7.6 20 4 16.4 4 12S7.6 4 12 4 20 7.6 20 12 16.4 20 12 20M12.5 7H11V13L16.2 16.2L17 15L12.5 12.2V7Z"/></svg>
+                        เริ่มประมวลผล Excel
+                    </button>
+                    <button class="secondary" onclick="clearAll()">
+                        <svg style="width:18px;height:18px" viewBox="0 0 24 24"><path fill="currentColor" d="M19.36 2.72L20.78 4.14L15.06 9.86L16.5 11.3H11.7V6.5L13.14 7.94L18.86 2.22M2.72 4.14L4.14 2.72L9.86 8.44L8.42 9.88L2.72 4.14M11.7 17.5H16.5L15.06 18.94L20.78 13.22L19.36 11.8L13.64 17.52L15.08 18.96M8.42 14.12L2.72 19.86L4.14 21.28L9.86 15.56L8.42 14.12Z"/></svg>
+                        ล้างข้อมูลทั้งหมด
+                    </button>
+                    <button class="warn" onclick="loadDemoNote()">
+                        <svg style="width:18px;height:18px" viewBox="0 0 24 24"><path fill="currentColor" d="M11,18H13V16H11V18M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M12,20C7.59,20 4,16.41 4,12C4,7.59 7.59,4 12,4C16.41,4 20,7.59 20,12C20,16.41 16.41,20 12,20M12,6A4,4 0 0,0 8,10H10A2,2 0 0,1 12,8A2,2 0 0,1 14,10C14,12 11,11.75 11,15H13C13,12.75 16,12.5 16,10A4,4 0 0,0 12,6Z"/></svg>
+                        วิธีเตรียมไฟล์ Excel
+                    </button>
+                </div>
+                <div class="status" id="status" style="display:none"></div>
+            </div>
+        </section>
+
+
+        <!-- Lab File Upload -->
+        <section class="panel">
+            <div class="upload-box" id="labDropZone" style="border-color:#fbbf24; background:rgba(255,251,235,0.55);">
+                <svg class="cloud-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color:#d97706" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2a4 4 0 014-4h7m0 0l-3-3m3 3l-3 3M4 19h10a2 2 0 002-2v-1M4 5h10a2 2 0 012 2v1M4 9h8M4 13h8"></path>
+                </svg>
+                <strong>อัปโหลดไฟล์ค่าแลป / ใบวางบิลแล็บ (Excel หรือ PDF)</strong>
+                <div class="muted">รองรับไฟล์ Excel (.xlsx, .xls) ที่มีหลายชีต และ <strong>ใบวางบิล PDF</strong> (ระบบจะใช้ OCR อ่านอัตโนมัติ) ระบบจะรวมค่าแลปตามชื่อคุณหมอและเติมเข้าในตารางให้อัตโนมัติ</div>
+                <input id="labFileInput" type="file" multiple accept=".xlsx,.xls,.pdf" />
+                <div class="file-chips-container" id="uploadedLabFilesList"></div>
+                <div class="actions" style="justify-content:center">
+                    <button class="warn" onclick="processSelectedLabFiles()">นำเข้าค่าแลปและ Match คุณหมอ</button>
+                    <button class="secondary" onclick="clearLabOnly()">ล้างค่าแลป</button>
+                </div>
+                <div class="status" id="labStatus" style="display:none"></div>
+            </div>
+        </section>
+
+        <!-- KPI Summaries -->
+        <section class="cards" id="kpiCards" style="display:none">
+            <div class="card c-branches">
+                <div class="card-header-info">
+                    <div class="label">จำนวนสาขาที่เชื่อมต่อ</div>
+                    <svg class="card-icon" viewBox="0 0 24 24"><path fill="currentColor" d="M12,3L2,12H5V20H19V12H22L12,3M12,7.7C14.1,7.7 15.8,9.4 15.8,11.5C15.8,14.5 12,18 12,18C12,18 8.2,14.5 8.2,11.5C8.2,9.4 9.9,7.7 12,7.7M12,10A1.5,1.5 0 0,0 10.5,11.5A1.5,1.5 0 0,0 12,13A1.5,1.5 0 0,0 13.5,11.5A1.5,1.5 0 0,0 12,10Z"/></svg>
+                </div>
+                <div class="value" id="kpiBranches">0</div>
+            </div>
+            <div class="card c-doctors">
+                <div class="card-header-info">
+                    <div class="label">ทันตแพทย์ทั้งหมด</div>
+                    <svg class="card-icon" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2C6.5 2 2 6.5 2 12S6.5 22 12 22 22 17.5 22 12 17.5 2 12 2M10 17L5 12L6.41 10.59L10 14.17L17.59 6.58L19 8L10 17Z"/></svg>
+                </div>
+                <div class="value" id="kpiDoctors">0</div>
+            </div>
+            <div class="card c-income">
+                <div class="card-header-info">
+                    <div class="label">รวม Income ทุกสาขา</div>
+                    <svg class="card-icon" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2C6.5 2 2 6.5 2 12S6.5 22 12 22 22 17.5 22 12 17.5 2 12 2M12 20C7.6 20 4 16.4 4 12S7.6 4 12 4 20 7.6 20 12 16.4 20 12 20M12.5 7H11V13L16.2 16.2L17 15L12.5 12.2V7Z"/></svg>
+                </div>
+                <div class="value money" id="kpiIncome">0.00</div>
+            </div>
+            <div class="card c-df">
+                <div class="card-header-info">
+                    <div class="label">รวม Dentist Fee ทุกสาขา</div>
+                    <svg class="card-icon" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2A10 10 0 0 0 2 12A10 10 0 0 0 12 22A10 10 0 0 0 22 12A10 10 0 0 0 12 2M12 4A8 8 0 0 1 20 12A8 8 0 0 1 12 20A8 8 0 0 1 4 12A8 8 0 0 1 12 4M11 6V8H9V10H11V14H9V16H11V18H13V16H15V14H13V10H15V8H13V6H11Z"/></svg>
+                </div>
+                <div class="value money" id="kpiDentistFee">0.00</div>
+            </div>
+            <div class="card c-clinic">
+                <div class="card-header-info">
+                    <div class="label">รวม Net Clinic ทุกสาขา</div>
+                    <svg class="card-icon" viewBox="0 0 24 24"><path fill="currentColor" d="M12,3L2,12H5V20H19V12H22L12,3M12,7.7C14.1,7.7 15.8,9.4 15.8,11.5C15.8,14.5 12,18 12,18C12,18 8.2,14.5 8.2,11.5C8.2,9.4 9.9,7.7 12,7.7M12,10A1.5,1.5 0 0,0 10.5,11.5A1.5,1.5 0 0,0 12,13A1.5,1.5 0 0,0 13.5,11.5A1.5,1.5 0 0,0 12,10Z"/></svg>
+                </div>
+                <div class="value money" id="kpiNetClinic">0.00</div>
+            </div>
+            <div class="card c-gross">
+                <div class="card-header-info">
+                    <div class="label">รวมรายได้หมอก่อนหัก</div>
+                    <svg class="card-icon" viewBox="0 0 24 24"><path fill="currentColor" d="M12,3L2,12H5V20H19V12H22L12,3M12,7.7C14.1,7.7 15.8,9.4 15.8,11.5C15.8,14.5 12,18 12,18C12,18 8.2,14.5 8.2,11.5C8.2,9.4 9.9,7.7 12,7.7M12,10A1.5,1.5 0 0,0 10.5,11.5A1.5,1.5 0 0,0 12,13A1.5,1.5 0 0,0 13.5,11.5A1.5,1.5 0 0,0 12,10Z"/></svg>
+                </div>
+                <div class="value money" id="kpiGross">0.00</div>
+            </div>
+            <div class="card c-net">
+                <div class="card-header-info">
+                    <div class="label">รวมยอดจ่ายสุทธิหลังหักแลป+เครื่องมือ</div>
+                    <svg class="card-icon" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2C6.5 2 2 6.5 2 12S6.5 22 12 22 22 17.5 22 12 17.5 2 12 2M10 17L5 12L6.41 10.59L10 14.17L17.59 6.58L19 8L10 17Z"/></svg>
+                </div>
+                <div class="value money" id="kpiNet">0.00</div>
+            </div>
+        </section>
+
+        <!-- Dynamic Results Panel -->
+        <section class="panel" id="resultPanel" style="display:none">
+            <div class="tabs">
+                <button class="tab active" onclick="showTab('doctor')" id="tabDoctor">สรุปยอดคุณหมอ</button>
+                <button class="tab" onclick="showTab('branch')" id="tabBranch">สรุปแยกสาขา</button>
+                <button class="tab" onclick="showTab('raw')" id="tabRaw">Raw Data ทั่วไป</button>
+                <button class="tab" onclick="showTab('lab')" id="tabLab">Raw ค่าแลป</button>
+            </div>
+
+            <!-- Toolbar filters -->
+            <div class="toolbar">
+                <input id="searchInput" placeholder="🔍 ค้นหาชื่อคุณหมอ หรือ ชื่อสาขา..." oninput="renderCurrentTab()" />
+                <select id="branchFilter" onchange="renderCurrentTab()">
+                    <option value="">ทุกสาขา</option>
+                </select>
+                <button onclick="exportXlsx()">
+                    <svg style="width:16px;height:16px" viewBox="0 0 24 24"><path fill="currentColor" d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20M16,11V15H13V18H11V15H8V13H11V11H13V13H16V11Z"/></svg>
+                    ดาวน์โหลด Excel (.xlsx)
+                </button>
+                <button class="secondary" onclick="exportCsv()">
+                    <svg style="width:16px;height:16px" viewBox="0 0 24 24"><path fill="currentColor" d="M14 2H6C4.9 2 4 2.9 4 4V20C4 21.1 4.9 22 6 22H18C19.1 22 20 21.1 20 20V8L14 2M18 20H6V4H13V9H18V20Z"/></svg>
+                    ส่งออก CSV
+                </button>
+            </div>
+
+            <!-- Doctor View Tab -->
+            <div id="doctorView">
+                <div class="muted" style="margin-bottom:16px; display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 16px;">💡</span> 
+                    <span>ช่องคอลัมน์ <strong>"ค่าแลป"</strong>, <strong>"ค่าเครื่องมือ"</strong> และ <strong>"สัดส่วนหัก (%)"</strong> สามารถคลิกแก้ตัวเลขได้ทันที ระบบจะคำนวณสัดส่วนที่หักสุทธิ และยอดจ่ายสุทธิใหม่อัตโนมัติ</span>
+                </div>
+                <div class="table-wrap">
+                    <table id="doctorTable"></table>
+                </div>
+            </div>
+
+            <!-- Branch Summary Tab -->
+            <div id="branchView" style="display:none">
+                <div class="table-wrap">
+                    <table id="branchTable"></table>
+                </div>
+            </div>
+
+            <!-- Raw Data Tab -->
+            <div id="rawView" style="display:none">
+                <div class="table-wrap">
+                    <table id="rawTable"></table>
+                </div>
+            </div>
+
+            <div id="labView" style="display:none">
+                <div class="muted" style="margin-bottom:16px;">ตารางนี้คือข้อมูลค่าแลปที่อ่านได้จากไฟล์ใบวางบิล แยกตามชีต/สาขา และใช้ Match กับชื่อคุณหมอในตารางรายได้</div>
+                <div class="table-wrap">
+                    <table id="labTable"></table>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Help Modal Template -->
+    <div id="demoModal" class="modal-overlay" style="display:none;">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3>วิธีเตรียมและโครงสร้างไฟล์ Excel ที่เหมาะสม</h3>
+                <button class="modal-close" onclick="closeDemoModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="muted" style="margin-bottom: 16px;">ระบบ MedIQ Link ทำการดึงและเชื่อมข้อมูลทันตแพทย์อย่างฉลาด โดยจะสแกนหาข้อความหัวข้อหลักที่มีคำว่า <strong>"Dentist Fee"</strong> และ <strong>"Total Income Summary"</strong> เพื่อแกะตารางโดยอัตโนมัติ โครงสร้างไฟล์ Excel ของท่านควรเป็นดังต่อไปนี้:</p>
+                
+                <div class="mock-excel-table-wrap">
+                    <table class="mock-excel-table">
+                        <thead>
+                            <tr>
+                                <th>คอลัมน์ A</th>
+                                <th>คอลัมน์ B</th>
+                                <th>คอลัมน์ C</th>
+                                <th>คอลัมน์ D</th>
+                                <th>คอลัมน์ E</th>
+                                <th>คอลัมน์ F</th>
+                                <th>คอลัมน์ G</th>
+                                <th>คอลัมน์ H</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="header-row">
+                                <td class="col-idx">Dentist Fee</td>
+                                <td>(ข้อมูลใดๆ)</td>
+                                <td>(ข้อมูลใดๆ)</td>
+                                <td>...</td>
+                                <td>...</td>
+                                <td>...</td>
+                                <td>...</td>
+                                <td>...</td>
+                            </tr>
+                            <tr class="subheader-row">
+                                <td class="col-idx">No.</td>
+                                <td>ชื่อแพทย์</td>
+                                <td>Fee</td>
+                                <td>...</td>
+                                <td>DF</td>
+                                <td>...</td>
+                                <td>...</td>
+                                <td>Prov Share</td>
+                            </tr>
+                            <tr>
+                                <td class="col-idx">1</td>
+                                <td>ทพ. สมเกียรติ พิทักษ์ไทย</td>
+                                <td>15,000.00</td>
+                                <td>...</td>
+                                <td>7,500.00</td>
+                                <td>...</td>
+                                <td>...</td>
+                                <td>7,500.00</td>
+                            </tr>
+                            <tr>
+                                <td class="col-idx">2</td>
+                                <td>ทพญ. วิไล วรรณดี</td>
+                                <td>8,200.00</td>
+                                <td>...</td>
+                                <td>4,100.00</td>
+                                <td>...</td>
+                                <td>...</td>
+                                <td>4,100.00</td>
+                            </tr>
+                            <tr class="footer-row">
+                                <td class="col-idx">Total Income Summary</td>
+                                <td>รวมยอดเงิน</td>
+                                <td>23,200.00</td>
+                                <td>11,600.00</td>
+                                <td>11,600.00</td>
+                                <td>...</td>
+                                <td>...</td>
+                                <td>...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="tips-grid">
+                    <div class="tip-item">
+                        <strong>🏥 การระบุคีย์เวิร์ดสำคัญ</strong>
+                        <span>ระบบจะเริ่มแกะข้อมูลทันตแพทย์ตั้งแต่ใต้แถวที่มีคำว่า <strong>"Dentist Fee"</strong> (ข้าม 1 แถวหัวข้อ) และหยุดประมวลผลทันทีเมื่อพบคำว่า <strong>"Total Income Summary"</strong></span>
+                    </div>
+                    <div class="tip-item">
+                        <strong>👩‍⚕️ คอลัมน์ระบุข้อมูล</strong>
+                        <span>ชื่อทันตแพทย์ต้องอยู่ใน <strong>คอลัมน์ B</strong>, ค่าหัตถการอยู่ใน <strong>คอลัมน์ C</strong>, และส่วนแบ่งรายได้แพทย์ (ก่อนหักแลป) ที่ดึงไปคำนวณรวมต้องอยู่ใน <strong>คอลัมน์ H (Prov Share)</strong></span>
+                    </div>
+                    <div class="tip-item">
+                        <strong>📊 แถวสรุปข้อมูลสาขา</strong>
+                        <span>ใต้ข้อความ <strong>Total Income Summary</strong> คอลัมน์ถัดๆ ไป (B, C, D) จะใช้ดึงสรุปยอดรวมของคลินิกสาขานั้นโดยอัตโนมัติ</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let rawRows = [];
+        let branchRows = [];
+        let doctorRows = [];
+        let branchNames = [];
+        let labState = {};
+        let equipState = {};
+        let currentTab = 'doctor';
+        let loadedFilesList = [];
+        let labRows = [];
+        let unmatchedLabRows = [];
+
+        // ===== Typhoon OCR + LLM API =====
+        const TYPHOON_API_KEY = 'sk-smttYhowQ5lS2JNi1aQAQiOaQZy4ZGucZTjmCbewvchGo7f8';
+        const TYPHOON_OCR_URL = 'https://api.opentyphoon.ai/v1/ocr';
+        const TYPHOON_LLM_URL = 'https://api.opentyphoon.ai/v1/chat/completions';
+        const MAX_PDF_FILES = 20;
+        const PDF_DELAY_MS = 1500; // delay between PDF files to avoid rate limit
+        const MAX_RETRIES = 3;
+
+        const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+        // Retry wrapper with exponential backoff for 429/5xx errors
+        async function fetchWithRetry(fetchFn, retries = MAX_RETRIES) {
+            for (let attempt = 1; attempt <= retries; attempt++) {
+                const response = await fetchFn();
+                if (response.ok) return response;
+
+                const isRetryable = response.status === 429 || response.status >= 500;
+                if (!isRetryable || attempt === retries) {
+                    const errText = await response.text();
+                    throw new Error(`API error ${response.status}: ${errText}`);
+                }
+
+                // Exponential backoff: 2s, 4s, 8s...
+                const waitMs = Math.pow(2, attempt) * 1000;
+                console.warn(`API returned ${response.status}, retrying in ${waitMs}ms (attempt ${attempt}/${retries})`);
+                await sleep(waitMs);
+            }
+        }
+
+        async function ocrPdfFile(file) {
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('model', 'typhoon-ocr');
+            formData.append('task_type', 'default');
+            formData.append('max_tokens', '16384');
+            formData.append('temperature', '0.1');
+            formData.append('top_p', '0.6');
+            formData.append('repetition_penalty', '1.2');
+
+            const response = await fetchWithRetry(() => fetch(TYPHOON_OCR_URL, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${TYPHOON_API_KEY}` },
+                body: formData
+            }));
+
+            const result = await response.json();
+            const texts = [];
+            for (const pageResult of result.results || []) {
+                if (pageResult.success && pageResult.message) {
+                    let content = pageResult.message.choices[0].message.content;
+                    try {
+                        const parsed = JSON.parse(content);
+                        content = parsed.natural_text || content;
+                    } catch (e) { /* use as-is */ }
+                    texts.push(content);
+                }
+            }
+            return texts.join('\n---PAGE BREAK---\n');
+        }
+
+        async function parseLabTextWithLLM(ocrText, fileName) {
+            const systemPrompt = `คุณเป็น AI ที่เชี่ยวชาญในการแกะข้อมูลจากใบวางบิลค่าแลปทันตกรรม (Dental Lab Invoice)
+จากข้อความ OCR ที่ให้มา ให้แกะข้อมูลต่อไปนี้ออกมาเป็น JSON array:
+
+แต่ละรายการใน array ต้องมี:
+- "doctor": ชื่อทันตแพทย์ (string) — ดึงจากช่อง "ทันตแพทย์" ในใบวางบิล
+- "amount": ยอดค่าแลปรวม (number) — ดึงจาก "รวมเป็นเงิน" หรือ "จำนวนเงิน" ที่ตรงกับทันตแพทย์คนนั้น
+- "branch": ชื่อสาขา/คลินิก (string) — ดึงจาก "นามลูกค้า" หรือ "คลินิก/ร.พ."
+- "invoiceNo": เลขที่ใบวางบิล (string)
+- "date": วันที่ออกบิล (string)
+- "customerName": ชื่อลูกค้า/คลินิกเต็ม (string)
+
+กฎสำคัญ:
+1. ตอบเป็น JSON array เท่านั้น ห้ามมีข้อความอื่นนอก JSON
+2. ถ้ามีหมอหลายคนในใบเดียว ให้แยกเป็นหลายรายการ
+3. ยอดเงินต้องเป็นตัวเลข (number) ไม่ใช่ string
+4. ถ้าอ่านข้อมูลไม่ได้ชัดเจน ให้ใส่ค่าที่เป็นไปได้มากที่สุด
+5. ถ้าชื่อสาขามีคำว่า "สาขา" ให้ดึงเฉพาะส่วนหลังคำว่า "สาขา" เช่น "คลินิกฯ สาขาซอยมังกร" → branch = "สาขาซอยมังกร"`;
+
+            const response = await fetchWithRetry(() => fetch(TYPHOON_LLM_URL, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${TYPHOON_API_KEY}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    model: 'typhoon-v2.5-30b-a3b-instruct',
+                    messages: [
+                        { role: 'system', content: systemPrompt },
+                        { role: 'user', content: `ข้อความ OCR จากไฟล์ "${fileName}":\n\n${ocrText}` }
+                    ],
+                    temperature: 0.1,
+                    max_completion_tokens: 4096,
+                    top_p: 0.6
+                })
+            }));
+
+            const result = await response.json();
+            let content = result.choices[0].message.content.trim();
+
+            // Strip markdown code fences if present
+            content = content.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+
+            const parsed = JSON.parse(content);
+            return Array.isArray(parsed) ? parsed : [parsed];
+        }
+
+        function isPdfFile(file) {
+            return file.name.toLowerCase().endsWith('.pdf');
+        }
+
+        const money = n => Number(n || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        
+        const num = v => {
+            if (typeof v === 'number') return v;
+            if (v === null || v === undefined) return 0;
+            const cleaned = String(v).replace(/,/g, '').replace(/[฿\s]/g, '').trim();
+            const parsed = Number(cleaned);
+            return Number.isFinite(parsed) ? parsed : 0;
+        };
+        const clean = v => String(v ?? '').trim();
+
+        function setStatus(msg) {
+            const statusEl = document.getElementById('status');
+            statusEl.style.display = 'inline-block';
+            statusEl.textContent = msg;
+        }
+
+        function setLabStatus(msg) {
+            const statusEl = document.getElementById('labStatus');
+            statusEl.style.display = 'inline-block';
+            statusEl.textContent = msg;
+        }
+
+        // Modal triggers
+        function openDemoModal() {
+            document.getElementById('demoModal').style.display = 'flex';
+        }
+
+        function closeDemoModal() {
+            document.getElementById('demoModal').style.display = 'none';
+        }
+
+        function loadDemoNote() {
+            openDemoModal();
+        }
+
+        // Drag and Drop Event listeners
+        const dropZone = document.getElementById('dropZone');
+        
+        dropZone.addEventListener('dragover', e => { 
+            e.preventDefault(); 
+            dropZone.classList.add('dragover');
+        });
+        
+        dropZone.addEventListener('dragleave', () => { 
+            dropZone.classList.remove('dragover');
+        });
+        
+        dropZone.addEventListener('drop', e => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            document.getElementById('fileInput').files = files;
+            
+            updateFileChips(Array.from(files));
+            processSelectedFiles();
+        });
+
+        // Trigger when input changes directly
+        document.getElementById('fileInput').addEventListener('change', e => {
+            updateFileChips(Array.from(e.target.files));
+        });
+
+        const labDropZone = document.getElementById('labDropZone');
+        labDropZone.addEventListener('dragover', e => {
+            e.preventDefault();
+            labDropZone.classList.add('dragover');
+        });
+        labDropZone.addEventListener('dragleave', () => {
+            labDropZone.classList.remove('dragover');
+        });
+        labDropZone.addEventListener('drop', e => {
+            e.preventDefault();
+            labDropZone.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            document.getElementById('labFileInput').files = files;
+            updateLabFileChips(Array.from(files));
+            processSelectedLabFiles();
+        });
+        document.getElementById('labFileInput').addEventListener('change', e => {
+            updateLabFileChips(Array.from(e.target.files));
+        });
+
+        function updateFileChips(files) {
+            const container = document.getElementById('uploadedFilesList');
+            if (!files.length) {
+                container.innerHTML = '';
+                return;
+            }
+            container.innerHTML = files.map(file => `
+                <div class="file-chip">
+                    <svg viewBox="0 0 24 24"><path fill="currentColor" d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"/></svg>
+                    <strong>${escapeHtml(file.name)}</strong>
+                    <span class="file-size">(${(file.size / 1024).toFixed(1)} KB)</span>
+                </div>
+            `).join('');
+        }
+
+
+        function updateLabFileChips(files) {
+            const container = document.getElementById('uploadedLabFilesList');
+            if (!files.length) {
+                container.innerHTML = '';
+                return;
+            }
+            container.innerHTML = files.map(file => `
+                <div class="file-chip">
+                    <svg viewBox="0 0 24 24"><path fill="currentColor" d="M14,2H6A2,2 0 0,0 4,4V20C4,21.1 4.9,22 6,22H18C19.1,22 20,21.1 20,20V8L14,2Z"/></svg>
+                    <strong>${escapeHtml(file.name)}</strong>
+                    <span class="file-size">(${(file.size / 1024).toFixed(1)} KB)</span>
+                </div>
+            `).join('');
+        }
+
+        async function processSelectedLabFiles() {
+            const files = Array.from(document.getElementById('labFileInput').files || []);
+            if (!files.length) return setLabStatus('❌ กรุณาเลือกไฟล์ค่าแลปก่อน');
+
+            labRows = [];
+            unmatchedLabRows = [];
+
+            const pdfFiles = files.filter(f => isPdfFile(f));
+            const excelFiles = files.filter(f => !isPdfFile(f));
+
+            // --- Process Excel files (existing flow) ---
+            if (excelFiles.length) {
+                setLabStatus(`⏳ กำลังอ่านไฟล์ Excel ค่าแลป ${excelFiles.length} ไฟล์...`);
+                for (const file of excelFiles) {
+                    try {
+                        const buffer = await file.arrayBuffer();
+                        const wb = XLSX.read(buffer, { type: 'array', cellDates: true });
+                        for (const sheetName of wb.SheetNames) {
+                            const ws = wb.Sheets[sheetName];
+                            const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+                            parseLabSheet(file.name, sheetName, rows);
+                        }
+                    } catch (err) {
+                        console.error(err);
+                        setLabStatus(`❌ อ่านไฟล์ Excel ${file.name} ไม่สำเร็จ: ${err.message}`);
+                    }
+                }
+            }
+
+            // --- Process PDF files (OCR flow) ---
+            if (pdfFiles.length) {
+                if (pdfFiles.length > MAX_PDF_FILES) {
+                    setLabStatus(`⚠️ เลือกไฟล์ PDF ${pdfFiles.length} ไฟล์ เกินขีดจำกัด ${MAX_PDF_FILES} ไฟล์ — จะประมวลผลเฉพาะ ${MAX_PDF_FILES} ไฟล์แรก`);
+                    await sleep(2000);
+                }
+                const pdfToProcess = pdfFiles.slice(0, MAX_PDF_FILES);
+                let pdfSuccessCount = 0;
+                let pdfFailCount = 0;
+
+                for (let pi = 0; pi < pdfToProcess.length; pi++) {
+                    const file = pdfToProcess[pi];
+                    try {
+                        setLabStatus(`⏳ [${pi + 1}/${pdfToProcess.length}] กำลัง OCR ไฟล์ PDF: ${file.name}...`);
+                        const ocrText = await ocrPdfFile(file);
+
+                        if (!ocrText || !ocrText.trim()) {
+                            setLabStatus(`⚠️ OCR ไม่พบข้อความในไฟล์ ${file.name}`);
+                            pdfFailCount++;
+                            continue;
+                        }
+
+                        setLabStatus(`⏳ [${pi + 1}/${pdfToProcess.length}] AI กำลังวิเคราะห์ข้อมูลค่าแลปจาก ${file.name}...`);
+                        const parsedItems = await parseLabTextWithLLM(ocrText, file.name);
+
+                        for (const item of parsedItems) {
+                            labRows.push({
+                                fileName: file.name,
+                                sheetName: 'PDF-OCR',
+                                branch: normalizeBranchName(item.branch || item.customerName || 'ไม่ระบุสาขา'),
+                                labType: 'PDF',
+                                customerName: item.customerName || item.branch || '',
+                                dateRange: item.date || '',
+                                doctor: item.doctor || 'ไม่ระบุชื่อหมอ',
+                                amount: num(item.amount)
+                            });
+                        }
+                        pdfSuccessCount++;
+                    } catch (err) {
+                        console.error('PDF OCR Error:', err);
+                        pdfFailCount++;
+                        // If rate limited even after retries, warn and continue
+                        const isRateLimit = err.message.includes('429');
+                        setLabStatus(`❌ ประมวลผล PDF ${file.name} ไม่สำเร็จ${isRateLimit ? ' (Rate Limit)' : ''}: ${err.message}`);
+                        if (isRateLimit) {
+                            setLabStatus(`⏳ รอ 5 วินาทีเนื่องจาก Rate Limit แล้วจะทำต่อ...`);
+                            await sleep(5000);
+                        }
+                    }
+
+                    // Delay between PDFs to prevent rate limiting
+                    if (pi < pdfToProcess.length - 1) {
+                        await sleep(PDF_DELAY_MS);
+                    }
+                }
+            }
+
+            applyLabToDoctors();
+            renderAll();
+            const matchedAmount = doctorRows.reduce((s, r) => s + num(r.labCost), 0);
+            const totalLab = labRows.reduce((s, r) => s + num(r.amount), 0);
+            const pdfCount = pdfFiles.length;
+            const excelCount = excelFiles.length;
+            const sourceInfo = [excelCount ? `Excel ${excelCount} ไฟล์` : '', pdfCount ? `PDF(OCR) ${pdfCount} ไฟล์` : ''].filter(Boolean).join(' + ');
+            setLabStatus(`✅ นำเข้าค่าแลปสำเร็จ [${sourceInfo}] ${labRows.length} รายการ / รวมค่าแลป ${money(totalLab)} / Match เข้าตารางหมอแล้ว ${money(matchedAmount)}${unmatchedLabRows.length ? ` / ยังไม่พบชื่อหมอ ${unmatchedLabRows.length} รายการ` : ''}`);
+        }
+
+        function parseLabSheet(fileName, sheetName, rows) {
+            const firstCell = clean(rows?.[0]?.[0]).toUpperCase();
+            if (!firstCell || (!firstCell.includes('DN') && !firstCell.includes('PC'))) return;
+
+            const labType = firstCell.includes('PC') ? 'PC' : 'DN';
+            const customerName = clean(rows?.[3]?.[1]);
+            const dateRange = clean(rows?.[2]?.[1]);
+
+            for (let r = 0; r < rows.length; r++) {
+                const row = rows[r] || [];
+                const doctor = clean(row[3]);
+                const amount = num(row[6] || row[4]);
+
+                if (
+                    doctor &&
+                    amount &&
+                    !doctor.includes('รวมทั้งสิ้น') &&
+                    !doctor.includes('ใบ') &&
+                    !doctor.includes('---') &&
+                    !doctor.includes('===') &&
+                    !clean(row[0]).startsWith('IV')
+                ) {
+                    labRows.push({
+                        fileName,
+                        sheetName,
+                        branch: normalizeBranchName(sheetName),
+                        labType,
+                        customerName,
+                        dateRange,
+                        doctor,
+                        amount
+                    });
+                }
+            }
+        }
+
+        function normalizeDoctorName(name) {
+            return clean(name)
+                .replace(/\u00a0/g, ' ')
+                .replace(/\s+/g, '')
+                .replace(/[.．]/g, '')
+                .replace(/ทันตแพทย์หญิง/g, 'ทพญ')
+                .replace(/ทันตแพทย์/g, 'ทพ')
+                .trim()
+                .toLowerCase();
+        }
+
+        // ดึง "ชื่อแกน" จากชื่อเต็ม เช่น "ทพ.ปฐมพงศ์ เครือจันทร์" → "ปฐมพงศ์"
+        // ใช้สำหรับ fuzzy match กรณีไฟล์รายได้ใส่ชื่อเดี่ยว เช่น "ปฐมพงศ์"
+        function extractCoreName(name) {
+            let s = clean(name)
+                .replace(/\u00a0/g, ' ')
+                .replace(/ทันตแพทย์หญิง/g, '')
+                .replace(/ทันตแพทย์/g, '')
+                .replace(/^ทพญ\.?\s*/i, '')
+                .replace(/^ทพ\.?\s*/i, '')
+                .replace(/^(นพ|นพ\.|พญ|พญ\.|ดร|ดร\.|ผศ|ผศ\.|รศ|รศ\.)\.?\s*/i, '')
+                .replace(/[.．]/g, '')
+                .trim();
+            // แยกเป็นชื่อ-นามสกุล → เอาเฉพาะคำแรก (ชื่อต้น)
+            const parts = s.split(/\s+/).filter(p => p.length > 0);
+            return parts.length > 0 ? parts[0].toLowerCase() : s.toLowerCase();
+        }
+
+        function applyLabToDoctors() {
+            if (!doctorRows.length) return;
+
+            // สร้าง labMap: รวมยอดค่าแลปตามชื่อหมอ (normalized)
+            const labMap = new Map();
+            for (const row of labRows) {
+                const key = normalizeDoctorName(row.doctor);
+                labMap.set(key, (labMap.get(key) || 0) + num(row.amount));
+            }
+
+            // สร้าง map ชื่อหมอจากรายได้ — ทั้ง normalized key และ core name
+            const doctorKeyMap = new Map();        // normalized → doctor
+            const doctorCoreMap = new Map();       // coreName → doctor
+            for (const row of doctorRows) {
+                const normKey = normalizeDoctorName(row.doctor);
+                const coreKey = extractCoreName(row.doctor);
+                doctorKeyMap.set(normKey, row.doctor);
+                // เก็บ core name → ใช้เป็น fallback matching
+                if (coreKey && coreKey.length >= 2) {
+                    doctorCoreMap.set(coreKey, row.doctor);
+                }
+                labState[row.doctor] = labState[row.doctor] || { labCost: 0, labPercent: 100 };
+                labState[row.doctor].labCost = 0;
+            }
+
+            unmatchedLabRows = [];
+            for (const [labKey, amount] of labMap.entries()) {
+                // 1) Exact normalized match
+                let matchedDoctor = doctorKeyMap.get(labKey);
+
+                // 2) Fallback: ดึง coreName จากชื่อแลป แล้วเทียบกับ coreName ของรายได้
+                if (!matchedDoctor) {
+                    // หาชื่อแลปจริงจาก labRows
+                    const sampleLab = labRows.find(x => normalizeDoctorName(x.doctor) === labKey);
+                    if (sampleLab) {
+                        const labCore = extractCoreName(sampleLab.doctor);
+                        if (labCore && labCore.length >= 2) {
+                            matchedDoctor = doctorCoreMap.get(labCore);
+                        }
+                    }
+                }
+
+                // 3) Fallback: contains-based — ชื่อรายได้ปรากฏภายในชื่อแลป
+                if (!matchedDoctor) {
+                    for (const [normDoc, docName] of doctorKeyMap.entries()) {
+                        if (normDoc.length >= 2 && labKey.includes(normDoc)) {
+                            matchedDoctor = docName;
+                            break;
+                        }
+                    }
+                }
+
+                if (matchedDoctor) {
+                    labState[matchedDoctor] = labState[matchedDoctor] || { labCost: 0, labPercent: 100 };
+                    labState[matchedDoctor].labCost += amount;
+                    if (labState[matchedDoctor].labPercent === undefined || labState[matchedDoctor].labPercent === '') {
+                        labState[matchedDoctor].labPercent = 100;
+                    }
+                } else {
+                    const originals = labRows.filter(x => normalizeDoctorName(x.doctor) === labKey);
+                    unmatchedLabRows.push(...originals);
+                }
+            }
+
+            for (const row of doctorRows) recalculate(row.doctor);
+        }
+
+        function clearLabOnly() {
+            labRows = [];
+            unmatchedLabRows = [];
+            for (const row of doctorRows) {
+                labState[row.doctor] = { labCost: 0, labPercent: 100 };
+                recalculate(row.doctor);
+            }
+            document.getElementById('labFileInput').value = '';
+            updateLabFileChips([]);
+            renderAll();
+            setLabStatus('🧹 ล้างข้อมูลค่าแลปแล้ว');
+        }
+
+
+        async function processSelectedFiles() {
+            const files = Array.from(document.getElementById('fileInput').files || []);
+            if (!files.length) return setStatus('❌ กรุณาเลือกไฟล์ Excel ก่อน');
+
+            rawRows = [];
+            branchRows = [];
+            doctorRows = [];
+            branchNames = [];
+            labState = {};
+
+            setStatus('⏳ กำลังคำนวณและประมวลผลไฟล์ Excel...');
+
+            for (const file of files) {
+                try {
+                    const buffer = await file.arrayBuffer();
+                    const wb = XLSX.read(buffer, { type: 'array', cellDates: true });
+                    const ws = wb.Sheets[wb.SheetNames[0]];
+                    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+                    parseBranchFile(file.name, rows);
+                } catch (err) {
+                    console.error(err);
+                    setStatus(`❌ เกิดข้อผิดพลาดในการอ่านไฟล์ ${file.name}: ${err.message}`);
+                }
+            }
+
+            buildDoctorSummary();
+            applyLabToDoctors();
+            renderAll();
+            setStatus(`✅ นำเข้าข้อมูลสำเร็จ: ประมวลผลแยกเป็น ${branchRows.length} สาขา / พบรายชื่อทันตแพทย์ทั้งหมด ${doctorRows.length} ท่าน`);
+        }
+
+        function normalizeBranchName(rawName) {
+            const s = clean(rawName).replace(/\s+/g, '').replace(/-/g, '').toLowerCase();
+            if (!s) return 'ไม่ระบุสาขา';
+            
+            if (s.includes('ซอยมังกร') || s.includes('สาขา6') || s.includes('branch6')) return 'สาขา 6';
+            if (s.includes('บ่อวิน') || s.includes('สาขา5') || s.includes('branch5')) return 'สาขา 5';
+            if (s.includes('ไปรษณีย์') || s.includes('สาขา4') || s.includes('branch4')) return 'สาขา 4';
+            if (s.includes('สะพานสี่') || s.includes('สาขา3') || s.includes('branch3')) return 'สาขา 3';
+            if (s.includes('แหลมฉบัง') || s.includes('สาขา2') || s.includes('branch2')) return 'สาขา 2';
+            
+            if (s.includes('สาขา1') || s.includes('branch1')) return 'สาขา 1';
+            
+            if (s.includes('หมอฟันคู่ใจ')) {
+                if (s.includes('2')) return 'สาขา 2';
+                if (s.includes('3')) return 'สาขา 3';
+                if (s.includes('4')) return 'สาขา 4';
+                if (s.includes('5')) return 'สาขา 5';
+                if (s.includes('6')) return 'สาขา 6';
+                return 'สาขา 1';
+            }
+            
+            if (s === '1' || s.endsWith('สาขา1')) return 'สาขา 1';
+            if (s === '2' || s.endsWith('สาขา2')) return 'สาขา 2';
+            if (s === '3' || s.endsWith('สาขา3')) return 'สาขา 3';
+            if (s === '4' || s.endsWith('สาขา4')) return 'สาขา 4';
+            if (s === '5' || s.endsWith('สาขา5')) return 'สาขา 5';
+            if (s === '6' || s.endsWith('สาขา6')) return 'สาขา 6';
+            
+            const match = s.match(/\d+/);
+            if (match) {
+                const num = parseInt(match[0]);
+                if (num >= 1 && num <= 6) {
+                    return `สาขา ${num}`;
+                }
+            }
+            
+            return clean(rawName).replace(/\s+/g, ' ');
+        }
+
+        // แปลงชื่อสาขาเต็มเป็นชื่อย่อ
+        function mapBranchName(rawName) {
+            return normalizeBranchName(rawName);
+        }
+
+        function parseBranchFile(fileName, rows) {
+            const branchName = mapBranchName(clean(rows?.[1]?.[0]) || fileName.replace(/\.xlsx?$/i, ''));
+            if (!branchNames.includes(branchName)) branchNames.push(branchName);
+
+            let dentistIndex = -1;
+            for (let i = 0; i < rows.length; i++) {
+                if (clean(rows[i][0]).toLowerCase() === 'dentist fee') {
+                    dentistIndex = i;
+                    break;
+                }
+            }
+
+            if (dentistIndex >= 0) {
+                for (let r = dentistIndex + 2; r < rows.length; r++) {
+                    const row = rows[r];
+                    if (!row || row.length === 0) continue;
+                    
+                    const firstCell = clean(row[0]).toLowerCase();
+                    if (firstCell.includes('total income summary')) break;
+
+                    const doctor = clean(row[1]);
+                    const fee = num(row[2]);
+                    const df = num(row[4]);
+                    const provShare = num(row[7]);
+
+                    if (doctor && provShare) {
+                        rawRows.push({
+                            fileName,
+                            branch: branchName,
+                            doctor,
+                            fee,
+                            df,
+                            provShare
+                        });
+                    }
+                }
+            }
+
+            let totalIncome = 0, totalDentistFee = 0, netClinic = 0;
+
+            let summaryIndex = -1;
+            for (let i = 0; i < rows.length; i++) {
+                if (clean(rows[i][0]).toLowerCase().includes('total income summary')) {
+                    summaryIndex = i;
+                    break;
+                }
+            }
+
+            if (summaryIndex >= 0) {
+                for (let r = summaryIndex + 1; r < rows.length; r++) {
+                    const row = rows[r] || [];
+                    const income = num(row[1]);
+                    const dentistFee = num(row[2]);
+                    const clinic = num(row[3]);
+
+                    if (income || dentistFee || clinic) {
+                        totalIncome = income;
+                        totalDentistFee = dentistFee;
+                        netClinic = clinic;
+                        break;
+                    }
+                }
+            }
+
+            branchRows.push({
+                branch: branchName,
+                fileName,
+                totalIncome,
+                totalDentistFee,
+                netClinic
+            });
+        }
+
+        function buildDoctorSummary() {
+            const map = new Map();
+            for (const row of rawRows) {
+                if (!map.has(row.doctor)) {
+                    const base = { doctor: row.doctor, totalGross: 0, labCost: 0, labPercent: 100, labDeduct: 0, equipCost: 0, equipPercent: 100, equipDeduct: 0, netPay: 0 };
+                    for (const b of branchNames) base[b] = 0;
+                    map.set(row.doctor, base);
+                }
+                const item = map.get(row.doctor);
+                item[row.branch] = (item[row.branch] || 0) + row.provShare;
+                item.totalGross += row.provShare;
+            }
+            doctorRows = Array.from(map.values()).sort((a, b) => b.totalGross - a.totalGross);
+            for (const row of doctorRows) {
+                labState[row.doctor] = { labCost: 0, labPercent: 100 };
+                equipState[row.doctor] = { equipCost: 0, equipPercent: 100 };
+                recalculate(row.doctor);
+            }
+        }
+
+        function recalculate(doctor) {
+            const row = doctorRows.find(x => x.doctor === doctor);
+            if (!row) return;
+            const lst = labState[doctor] || { labCost: 0, labPercent: 100 };
+            const est = equipState[doctor] || { equipCost: 0, equipPercent: 100 };
+            row.labCost = num(lst.labCost);
+            row.labPercent = num(lst.labPercent);
+            row.labDeduct = row.labCost * (row.labPercent / 100);
+            row.equipCost = num(est.equipCost);
+            row.equipPercent = num(est.equipPercent);
+            row.equipDeduct = row.equipCost * (row.equipPercent / 100);
+            row.netPay = row.totalGross - row.labDeduct - row.equipDeduct;
+        }
+
+        function updateLab(doctor, field, value) {
+            labState[doctor] = labState[doctor] || { labCost: 0, labPercent: 100 };
+            labState[doctor][field] = value;
+            recalculate(doctor);
+            renderDoctorTable();
+            updateKpis();
+        }
+
+        function updateEquip(doctor, field, value) {
+            equipState[doctor] = equipState[doctor] || { equipCost: 0, equipPercent: 100 };
+            equipState[doctor][field] = value;
+            recalculate(doctor);
+            renderDoctorTable();
+            updateKpis();
+        }
+
+        function filteredRaw() {
+            const q = clean(document.getElementById('searchInput').value).toLowerCase();
+            const bf = document.getElementById('branchFilter').value;
+            return rawRows.filter(r => (!q || r.doctor.toLowerCase().includes(q) || r.branch.toLowerCase().includes(q)) && (!bf || r.branch === bf));
+        }
+
+        function filteredDoctors() {
+            const q = clean(document.getElementById('searchInput').value).toLowerCase();
+            const bf = document.getElementById('branchFilter').value;
+            return doctorRows.filter(r => {
+                const hasBranch = !bf || (r[bf] || 0) !== 0;
+                return (!q || r.doctor.toLowerCase().includes(q)) && hasBranch;
+            });
+        }
+
+        function renderAll() {
+            document.getElementById('resultPanel').style.display = 'block';
+            document.getElementById('kpiCards').style.display = 'grid';
+
+            const select = document.getElementById('branchFilter');
+            select.innerHTML = '<option value="">ทุกสาขา</option>' + branchNames.map(b => `<option value="${escapeHtml(b)}">${escapeHtml(b)}</option>`).join('');
+
+            updateKpis();
+            renderCurrentTab();
+        }
+
+        function updateKpis() {
+            const totalGross = doctorRows.reduce((s, r) => s + r.totalGross, 0);
+            const totalNet = doctorRows.reduce((s, r) => s + r.netPay, 0);
+            const totalIncome = branchRows.reduce((s, r) => s + num(r.totalIncome), 0);
+            const totalDentistFee = branchRows.reduce((s, r) => s + num(r.totalDentistFee), 0);
+            const totalNetClinic = branchRows.reduce((s, r) => s + num(r.netClinic), 0);
+            
+            document.getElementById('kpiBranches').textContent = branchRows.length;
+            document.getElementById('kpiDoctors').textContent = doctorRows.length;
+            document.getElementById('kpiIncome').textContent = money(totalIncome);
+            document.getElementById('kpiDentistFee').textContent = money(totalDentistFee);
+            document.getElementById('kpiNetClinic').textContent = money(totalNetClinic);
+            document.getElementById('kpiGross').textContent = money(totalGross);
+            document.getElementById('kpiNet').textContent = money(totalNet);
+        }
+
+        function showTab(tab) {
+            currentTab = tab;
+            document.getElementById('doctorView').style.display = tab === 'doctor' ? 'block' : 'none';
+            document.getElementById('branchView').style.display = tab === 'branch' ? 'block' : 'none';
+            document.getElementById('rawView').style.display = tab === 'raw' ? 'block' : 'none';
+            document.getElementById('labView').style.display = tab === 'lab' ? 'block' : 'none';
+            
+            document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+            document.getElementById(tab === 'doctor' ? 'tabDoctor' : tab === 'branch' ? 'tabBranch' : tab === 'raw' ? 'tabRaw' : 'tabLab').classList.add('active');
+            renderCurrentTab();
+        }
+
+        function renderCurrentTab() {
+            if (currentTab === 'doctor') renderDoctorTable();
+            if (currentTab === 'branch') renderBranchTable();
+            if (currentTab === 'raw') renderRawTable();
+            if (currentTab === 'lab') renderLabTable();
+        }
+
+        function renderDoctorTable() {
+            const table = document.getElementById('doctorTable');
+            const rows = filteredDoctors();
+            const branchHeaders = branchNames.map(b => `<th>${escapeHtml(b)}</th>`).join('');
+            
+            const totalSumByBranch = {};
+            for(const b of branchNames) {
+                totalSumByBranch[b] = rows.reduce((s, r) => s + (r[b] || 0), 0);
+            }
+            const totalGrossSum = rows.reduce((s, r) => s + r.totalGross, 0);
+            const totalLabCostSum = rows.reduce((s, r) => s + r.labCost, 0);
+            const totalLabDeductSum = rows.reduce((s, r) => s + r.labDeduct, 0);
+            const totalEquipCostSum = rows.reduce((s, r) => s + r.equipCost, 0);
+            const totalEquipDeductSum = rows.reduce((s, r) => s + r.equipDeduct, 0);
+            const totalNetPaySum = rows.reduce((s, r) => s + r.netPay, 0);
+
+            table.innerHTML = `
+    <thead><tr>
+      <th>คุณหมอ</th>${branchHeaders}<th>รวมก่อนหัก</th><th>ค่าแลป</th><th>สัดส่วนหักแลป (%)</th><th>ค่าแลปที่หัก</th><th>ค่าเครื่องมือ</th><th>สัดส่วนหักเครื่องมือ (%)</th><th>ค่าเครื่องมือที่หัก</th><th>ยอดจ่ายสุทธิ</th>
+    </tr></thead>
+    <tbody>
+      ${rows.map(r => `
+        <tr>
+          <td>${escapeHtml(r.doctor)}</td>
+          ${branchNames.map(b => `<td class="money">${money(r[b] || 0)}</td>`).join('')}
+          <td class="money" style="font-weight: 700;">${money(r.totalGross)}</td>
+          <td>
+            <div class="input-cell-wrapper">
+                <input class="input-cell" type="number" step="0.01" value="${r.labCost}" onchange="updateLab('${jsEscape(r.doctor)}','labCost',this.value)">
+            </div>
+          </td>
+          <td>
+            <div class="input-cell-wrapper">
+                <input class="input-cell" type="number" step="0.1" min="0" max="100" value="${r.labPercent}" onchange="updateLab('${jsEscape(r.doctor)}','labPercent',this.value)">
+            </div>
+          </td>
+          <td class="money"><span class="badge bad">${money(r.labDeduct)}</span></td>
+          <td>
+            <div class="input-cell-wrapper">
+                <input class="input-cell" type="number" step="0.01" value="${r.equipCost}" onchange="updateEquip('${jsEscape(r.doctor)}','equipCost',this.value)">
+            </div>
+          </td>
+          <td>
+            <div class="input-cell-wrapper">
+                <input class="input-cell" type="number" step="0.1" min="0" max="100" value="${r.equipPercent}" onchange="updateEquip('${jsEscape(r.doctor)}','equipPercent',this.value)">
+            </div>
+          </td>
+          <td class="money"><span class="badge bad">${money(r.equipDeduct)}</span></td>
+          <td class="money"><span class="badge ok">${money(r.netPay)}</span></td>
+        </tr>`).join('')}
+        
+        <!-- Total Row -->
+        <tr style="background-color: var(--neutral-50); font-weight: bold;">
+          <td>รวมทุกราย</td>
+          ${branchNames.map(b => `<td class="money">${money(totalSumByBranch[b])}</td>`).join('')}
+          <td class="money">${money(totalGrossSum)}</td>
+          <td class="money">${money(totalLabCostSum)}</td>
+          <td class="money">-</td>
+          <td class="money"><span class="badge bad">${money(totalLabDeductSum)}</span></td>
+          <td class="money">${money(totalEquipCostSum)}</td>
+          <td class="money">-</td>
+          <td class="money"><span class="badge bad">${money(totalEquipDeductSum)}</span></td>
+          <td class="money"><span class="badge ok">${money(totalNetPaySum)}</span></td>
+        </tr>
+    </tbody>`;
+        }
+
+        function renderBranchTable() {
+            const table = document.getElementById('branchTable');
+            const q = clean(document.getElementById('searchInput').value).toLowerCase();
+            const bf = document.getElementById('branchFilter').value;
+            const rows = branchRows.filter(r => (!q || r.branch.toLowerCase().includes(q)) && (!bf || r.branch === bf));
+            
+            // รวมค่าแลปตามสาขา
+            const labByBranch = {};
+            for (const lr of labRows) {
+                labByBranch[lr.branch] = (labByBranch[lr.branch] || 0) + num(lr.amount);
+            }
+
+            const totalIncome = rows.reduce((s, r) => s + num(r.totalIncome), 0);
+            const totalDentistFee = rows.reduce((s, r) => s + num(r.totalDentistFee), 0);
+            const totalNetClinic = rows.reduce((s, r) => s + num(r.netClinic), 0);
+            const totalLabBranch = rows.reduce((s, r) => s + (labByBranch[r.branch] || 0), 0);
+            
+            table.innerHTML = `
+    <thead><tr><th>ชื่อสาขา</th><th>ชื่อไฟล์ Excel</th><th>Income รวมสาขา</th><th>Dentist Fee สรุป</th><th>Net Clinic สรุป</th><th>ค่าแลปรวม</th></tr></thead>
+    <tbody>
+      ${rows.map(r => `
+      <tr>
+        <td>${escapeHtml(r.branch)}</td>
+        <td style="color: var(--neutral-600); font-size:12px;">${escapeHtml(r.fileName)}</td>
+        <td class="money">${money(r.totalIncome)}</td>
+        <td class="money">${money(r.totalDentistFee)}</td>
+        <td class="money">${money(r.netClinic)}</td>
+        <td class="money">${labByBranch[r.branch] ? '<span class="badge bad">' + money(labByBranch[r.branch]) + '</span>' : '<span style="color:var(--neutral-400)">—</span>'}</td>
+      </tr>
+      `).join('')}
+      <tr style="font-weight: 700; background: var(--neutral-50);">
+        <td>รวมทั้งหมด</td>
+        <td style="font-size:12px; color:var(--neutral-600)">${rows.length} สาขา</td>
+        <td class="money">${money(totalIncome)}</td>
+        <td class="money">${money(totalDentistFee)}</td>
+        <td class="money">${money(totalNetClinic)}</td>
+        <td class="money"><span class="badge bad">${money(totalLabBranch)}</span></td>
+      </tr>
+    </tbody>`;
+        }
+
+        function renderRawTable() {
+            const table = document.getElementById('rawTable');
+            const rows = filteredRaw();
+            table.innerHTML = `
+    <thead><tr><th>คุณหมอ</th><th>สาขา</th><th>ไฟล์</th><th>Fee รวม</th><th>DF สัดส่วน</th><th>Prov Share สุทธิ</th></tr></thead>
+    <tbody>${rows.map(r => `
+      <tr>
+        <td>${escapeHtml(r.doctor)}</td>
+        <td><span class="badge" style="background:#e0f2fe; color:#0369a1; font-weight:700;">${escapeHtml(r.branch)}</span></td>
+        <td style="color: var(--neutral-400); font-size:12px;">${escapeHtml(r.fileName)}</td>
+        <td class="money">${money(r.fee)}</td>
+        <td class="money">${money(r.df)}</td>
+        <td class="money" style="font-weight:700; color: var(--primary);">${money(r.provShare)}</td>
+      </tr>
+    `).join('')}</tbody>`;
+        }
+
+
+        function renderLabTable() {
+            const table = document.getElementById('labTable');
+            if (!table) return;
+
+            const q = clean(document.getElementById('searchInput').value).toLowerCase();
+            const bf = document.getElementById('branchFilter').value;
+
+            const rows = labRows.filter(r =>
+                (!q || r.doctor.toLowerCase().includes(q) || r.branch.toLowerCase().includes(q) || r.labType.toLowerCase().includes(q)) &&
+                (!bf || r.branch === bf)
+            );
+
+            // สร้าง set สำหรับจับคู่แบบ 3 ชั้น เหมือน applyLabToDoctors
+            const doctorNormKeys = new Set(doctorRows.map(r => normalizeDoctorName(r.doctor)));
+            const doctorCoreKeys = new Map();
+            const doctorNormMap = new Map();
+            for (const dr of doctorRows) {
+                const normKey = normalizeDoctorName(dr.doctor);
+                const coreKey = extractCoreName(dr.doctor);
+                doctorNormMap.set(normKey, dr.doctor);
+                if (coreKey && coreKey.length >= 2) {
+                    doctorCoreKeys.set(coreKey, dr.doctor);
+                }
+            }
+
+            function isLabDoctorMatched(labDoctorName) {
+                const labNorm = normalizeDoctorName(labDoctorName);
+                // 1) Exact normalized match
+                if (doctorNormKeys.has(labNorm)) return true;
+                // 2) Core name match
+                const labCore = extractCoreName(labDoctorName);
+                if (labCore && labCore.length >= 2 && doctorCoreKeys.has(labCore)) return true;
+                // 3) Contains match
+                for (const [normDoc] of doctorNormMap.entries()) {
+                    if (normDoc.length >= 2 && labNorm.includes(normDoc)) return true;
+                }
+                return false;
+            }
+
+            const totalLab = rows.reduce((s, r) => s + num(r.amount), 0);
+
+            table.innerHTML = `
+    <thead><tr><th>สถานะ Match</th><th>คุณหมอ</th><th>สาขา/ชีต</th><th>ประเภท</th><th>ชื่อลูกค้า</th><th>ช่วงวันที่</th><th>ไฟล์</th><th>ยอดค่าแลป</th></tr></thead>
+    <tbody>
+      ${rows.map(r => {
+        const matched = isLabDoctorMatched(r.doctor);
+        return `
+        <tr>
+          <td><span class="badge ${matched ? 'ok' : 'bad'}">${matched ? 'Matched' : 'ไม่พบในรายได้'}</span></td>
+          <td>${escapeHtml(r.doctor)}</td>
+          <td>${escapeHtml(r.branch)}</td>
+          <td>${escapeHtml(r.labType)}</td>
+          <td>${escapeHtml(r.customerName)}</td>
+          <td>${escapeHtml(r.dateRange)}</td>
+          <td style="color: var(--neutral-400); font-size:12px;">${escapeHtml(r.fileName)}</td>
+          <td class="money" style="font-weight:700;">${money(r.amount)}</td>
+        </tr>`;
+      }).join('')}
+      <tr style="font-weight: 700; background: var(--neutral-50);">
+        <td>รวม</td><td colspan="6">${rows.length} รายการ</td><td class="money">${money(totalLab)}</td>
+      </tr>
+    </tbody>`;
+        }
+
+
+        function exportXlsx() {
+            if (!doctorRows.length) return;
+            const wb = XLSX.utils.book_new();
+            const doctorExport = doctorRows.map(r => {
+                const o = { 'คุณหมอ': r.doctor };
+                for (const b of branchNames) o[b] = r[b] || 0;
+                o['รวมก่อนหัก'] = r.totalGross;
+                o['ค่าแลป'] = r.labCost;
+                o['สัดส่วนหักแลป (%)'] = r.labPercent;
+                o['ค่าแลปที่ต้องหัก'] = r.labDeduct;
+                o['ค่าเครื่องมือ'] = r.equipCost;
+                o['สัดส่วนหักเครื่องมือ (%)'] = r.equipPercent;
+                o['ค่าเครื่องมือที่ต้องหัก'] = r.equipDeduct;
+                o['ยอดจ่ายสุทธิ'] = r.netPay;
+                return o;
+            });
+            const branchExport = [...branchRows, {
+                branch: 'รวมทุกสาขา',
+                fileName: `${branchRows.length} สาขา`,
+                totalIncome: branchRows.reduce((s, r) => s + num(r.totalIncome), 0),
+                totalDentistFee: branchRows.reduce((s, r) => s + num(r.totalDentistFee), 0),
+                netClinic: branchRows.reduce((s, r) => s + num(r.netClinic), 0)
+            }];
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(doctorExport), 'รายได้คุณหมอรวม');
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(branchExport), 'สรุปสาขา');
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rawRows), 'Raw Data');
+            if (labRows.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(labRows), 'Raw ค่าแลป');
+            if (unmatchedLabRows.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(unmatchedLabRows), 'ค่าแลปยังไม่ Match');
+            XLSX.writeFile(wb, 'สรุปรายได้คุณหมอ_คำนวณจากเว็บ.xlsx');
+        }
+
+        function exportCsv() {
+            if (!doctorRows.length) return;
+            const headers = ['คุณหมอ', ...branchNames, 'รวมก่อนหัก', 'ค่าแลป', 'สัดส่วนหักแลป (%)', 'ค่าแลปที่ต้องหัก', 'ค่าเครื่องมือ', 'สัดส่วนหักเครื่องมือ (%)', 'ค่าเครื่องมือที่ต้องหัก', 'ยอดจ่ายสุทธิ'];
+            const lines = [headers.join(',')];
+            for (const r of doctorRows) {
+                const vals = [r.doctor, ...branchNames.map(b => r[b] || 0), r.totalGross, r.labCost, r.labPercent, r.labDeduct, r.equipCost, r.equipPercent, r.equipDeduct, r.netPay];
+                lines.push(vals.map(csvSafe).join(','));
+            }
+            const blob = new Blob(['\ufeff' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'สรุปรายได้คุณหมอ.csv';
+            a.click();
+        }
+
+        function clearAll() {
+            rawRows = []; branchRows = []; doctorRows = []; branchNames = []; labState = {}; equipState = {}; labRows = []; unmatchedLabRows = {};
+            document.getElementById('fileInput').value = '';
+            document.getElementById('labFileInput').value = '';
+            document.getElementById('resultPanel').style.display = 'none';
+            document.getElementById('kpiCards').style.display = 'none';
+            updateFileChips([]);
+            updateLabFileChips([]);
+            setStatus('🧹 ล้างข้อมูลเรียบร้อยแล้ว');
+            
+            setTimeout(() => {
+                const st = document.getElementById('status');
+                st.style.display = 'none';
+            }, 3000);
+        }
+
+        function escapeHtml(str) {
+            return String(str ?? '').replace(/[&<>"]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]));
+        }
+        function jsEscape(str) { return String(str ?? '').replace(/\\/g, '\\\\').replace(/'/g, "\\'"); }
+        
+        function csvSafe(v) {
+            const s = String(v ?? '');
+            return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+        }
+    </script>
+</body>
+
+</html>
