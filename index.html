@@ -506,6 +506,45 @@
             font-weight: 800;
         }
 
+        /* ===== Doctor Table Color Groups (Excel-style) ===== */
+        #doctorTable { min-width: auto; }
+        #doctorTable .grp-header {
+            text-align: center !important;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.3px;
+            border-bottom: 2px solid rgba(0,0,0,0.08);
+        }
+        #doctorTable .grp-df      { background: #fef9c3 !important; color: #854d0e; }
+        #doctorTable .grp-total    { background: #d1fae5 !important; color: #065f46; }
+        #doctorTable .grp-lab      { background: #f3e8ff !important; color: #6b21a8; }
+        #doctorTable .grp-deduct   { background: #fee2e2 !important; color: #991b1b; }
+        #doctorTable .grp-equip    { background: #dbeafe !important; color: #1e40af; }
+        #doctorTable .grp-net      { background: #ccfbf1 !important; color: #115e59; }
+
+        #doctorTable td.c-df       { background: #fffef5; }
+        #doctorTable td.c-total    { background: #f0fdf4; font-weight: 700; }
+        #doctorTable td.c-lab      { background: #faf5ff; }
+        #doctorTable td.c-deduct   { background: #fff5f5; }
+        #doctorTable td.c-equip    { background: #f0f9ff; }
+        #doctorTable td.c-net      { background: #f0fdfa; }
+
+        #doctorTable .row-num {
+            text-align: center !important;
+            color: var(--neutral-400);
+            font-size: 12px;
+            font-weight: 500;
+            width: 36px;
+            min-width: 36px;
+        }
+        #doctorTable thead tr:first-child th {
+            border-bottom: 0;
+        }
+        #doctorTable thead tr:nth-child(2) th {
+            font-size: 11px;
+            padding: 8px 10px;
+        }
+
         /* Elegant inline table input */
         .input-cell-wrapper {
             display: inline-flex;
@@ -1059,6 +1098,7 @@
         let loadedFilesList = [];
         let labRows = [];
         let unmatchedLabRows = [];
+        let labBranchMap = {};
 
         // ===== Typhoon OCR + LLM API =====
         const TYPHOON_API_KEY = 'sk-smttYhowQ5lS2JNi1aQAQiOaQZy4ZGucZTjmCbewvchGo7f8';
@@ -1448,6 +1488,17 @@
         function applyLabToDoctors() {
             if (!doctorRows.length) return;
 
+            labBranchMap = {};
+
+            // สร้าง labMapByBranch: normKey → Map(branch → amount)
+            const labMapByBranch = new Map();
+            for (const row of labRows) {
+                const key = normalizeDoctorName(row.doctor);
+                if (!labMapByBranch.has(key)) labMapByBranch.set(key, new Map());
+                const bm = labMapByBranch.get(key);
+                bm.set(row.branch, (bm.get(row.branch) || 0) + num(row.amount));
+            }
+
             // สร้าง labMap: รวมยอดค่าแลปตามชื่อหมอ (normalized)
             const labMap = new Map();
             for (const row of labRows) {
@@ -1503,6 +1554,14 @@
                     if (labState[matchedDoctor].labPercent === undefined || labState[matchedDoctor].labPercent === '') {
                         labState[matchedDoctor].labPercent = 100;
                     }
+                    // เก็บค่าแลปแยกสาขาสำหรับตาราง
+                    const branchAmounts = labMapByBranch.get(labKey);
+                    if (branchAmounts) {
+                        if (!labBranchMap[matchedDoctor]) labBranchMap[matchedDoctor] = {};
+                        for (const [br, amt] of branchAmounts.entries()) {
+                            labBranchMap[matchedDoctor][br] = (labBranchMap[matchedDoctor][br] || 0) + amt;
+                        }
+                    }
                 } else {
                     const originals = labRows.filter(x => normalizeDoctorName(x.doctor) === labKey);
                     unmatchedLabRows.push(...originals);
@@ -1515,6 +1574,7 @@
         function clearLabOnly() {
             labRows = [];
             unmatchedLabRows = [];
+            labBranchMap = {};
             for (const row of doctorRows) {
                 labState[row.doctor] = { labCost: 0, labPercent: 100 };
                 recalculate(row.doctor);
@@ -1535,6 +1595,7 @@
             doctorRows = [];
             branchNames = [];
             labState = {};
+            labBranchMap = {};
 
             setStatus('⏳ กำลังคำนวณและประมวลผลไฟล์ Excel...');
 
@@ -1687,6 +1748,7 @@
                 item.totalGross += row.provShare;
             }
             doctorRows = Array.from(map.values()).sort((a, b) => b.totalGross - a.totalGross);
+            labBranchMap = {};
             for (const row of doctorRows) {
                 labState[row.doctor] = { labCost: 0, labPercent: 100 };
                 equipState[row.doctor] = { equipCost: 0, equipPercent: 100 };
@@ -1788,12 +1850,18 @@
         function renderDoctorTable() {
             const table = document.getElementById('doctorTable');
             const rows = filteredDoctors();
-            const branchHeaders = branchNames.map(b => `<th>${escapeHtml(b)}</th>`).join('');
-            
+            const bLen = branchNames.length;
+
+            // Totals for DF per branch
             const totalSumByBranch = {};
-            for(const b of branchNames) {
-                totalSumByBranch[b] = rows.reduce((s, r) => s + (r[b] || 0), 0);
+            for (const b of branchNames) totalSumByBranch[b] = rows.reduce((s, r) => s + (r[b] || 0), 0);
+
+            // Totals for Lab per branch
+            const totalLabByBranch = {};
+            for (const b of branchNames) {
+                totalLabByBranch[b] = rows.reduce((s, r) => s + ((labBranchMap[r.doctor] || {})[b] || 0), 0);
             }
+
             const totalGrossSum = rows.reduce((s, r) => s + r.totalGross, 0);
             const totalLabCostSum = rows.reduce((s, r) => s + r.labCost, 0);
             const totalLabDeductSum = rows.reduce((s, r) => s + r.labDeduct, 0);
@@ -1802,53 +1870,75 @@
             const totalNetPaySum = rows.reduce((s, r) => s + r.netPay, 0);
 
             table.innerHTML = `
-    <thead><tr>
-      <th>คุณหมอ</th>${branchHeaders}<th>รวมก่อนหัก</th><th>ค่าแลป</th><th>สัดส่วนหักแลป (%)</th><th>ค่าแลปที่หัก</th><th>ค่าเครื่องมือ</th><th>สัดส่วนหักเครื่องมือ (%)</th><th>ค่าเครื่องมือที่หัก</th><th>ยอดจ่ายสุทธิ</th>
-    </tr></thead>
+    <thead>
+      <tr>
+        <th rowspan="2" style="width:36px;text-align:center">#</th>
+        <th rowspan="2">คุณหมอ</th>
+        <th colspan="${bLen}" class="grp-header grp-df">💰 ยอดรวม DF แยกสาขา</th>
+        <th rowspan="2" class="grp-header grp-total">รวมก่อนหัก</th>
+        <th colspan="${bLen}" class="grp-header grp-lab">🧪 ค่าแลปแยกสาขา</th>
+        <th rowspan="2" class="grp-header grp-lab">รวมค่าแลป</th>
+        <th colspan="2" class="grp-header grp-deduct">หักค่าแลป</th>
+        <th colspan="3" class="grp-header grp-equip">🔧 ค่าเครื่องมือ</th>
+        <th rowspan="2" class="grp-header grp-net">✅ ยอดจ่ายสุทธิ</th>
+      </tr>
+      <tr>
+        ${branchNames.map(b => `<th class="grp-df">${escapeHtml(b)}</th>`).join('')}
+        ${branchNames.map(b => `<th class="grp-lab">${escapeHtml(b)}</th>`).join('')}
+        <th class="grp-deduct">สัดส่วน (%)</th>
+        <th class="grp-deduct">ที่หัก</th>
+        <th class="grp-equip">ค่าเครื่องมือ</th>
+        <th class="grp-equip">สัดส่วน (%)</th>
+        <th class="grp-equip">ที่หัก</th>
+      </tr>
+    </thead>
     <tbody>
-      ${rows.map(r => `
+      ${rows.map((r, idx) => {
+        const dLab = labBranchMap[r.doctor] || {};
+        return `
         <tr>
+          <td class="row-num">${idx + 1}</td>
           <td>${escapeHtml(r.doctor)}</td>
-          ${branchNames.map(b => `<td class="money">${money(r[b] || 0)}</td>`).join('')}
-          <td class="money" style="font-weight: 700;">${money(r.totalGross)}</td>
-          <td>
-            <div class="input-cell-wrapper">
-                <input class="input-cell" type="number" step="0.01" value="${r.labCost}" onchange="updateLab('${jsEscape(r.doctor)}','labCost',this.value)">
-            </div>
-          </td>
-          <td>
+          ${branchNames.map(b => `<td class="money c-df">${money(r[b] || 0)}</td>`).join('')}
+          <td class="money c-total">${money(r.totalGross)}</td>
+          ${branchNames.map(b => `<td class="money c-lab">${dLab[b] ? money(dLab[b]) : '<span style="color:var(--neutral-300)">—</span>'}</td>`).join('')}
+          <td class="money c-lab" style="font-weight:700">${money(r.labCost)}</td>
+          <td class="c-deduct">
             <div class="input-cell-wrapper">
                 <input class="input-cell" type="number" step="0.1" min="0" max="100" value="${r.labPercent}" onchange="updateLab('${jsEscape(r.doctor)}','labPercent',this.value)">
             </div>
           </td>
-          <td class="money"><span class="badge bad">${money(r.labDeduct)}</span></td>
-          <td>
+          <td class="money c-deduct"><span class="badge bad">${money(r.labDeduct)}</span></td>
+          <td class="c-equip">
             <div class="input-cell-wrapper">
                 <input class="input-cell" type="number" step="0.01" value="${r.equipCost}" onchange="updateEquip('${jsEscape(r.doctor)}','equipCost',this.value)">
             </div>
           </td>
-          <td>
+          <td class="c-equip">
             <div class="input-cell-wrapper">
                 <input class="input-cell" type="number" step="0.1" min="0" max="100" value="${r.equipPercent}" onchange="updateEquip('${jsEscape(r.doctor)}','equipPercent',this.value)">
             </div>
           </td>
-          <td class="money"><span class="badge bad">${money(r.equipDeduct)}</span></td>
-          <td class="money"><span class="badge ok">${money(r.netPay)}</span></td>
-        </tr>`).join('')}
-        
-        <!-- Total Row -->
-        <tr style="background-color: var(--neutral-50); font-weight: bold;">
-          <td>รวมทุกราย</td>
-          ${branchNames.map(b => `<td class="money">${money(totalSumByBranch[b])}</td>`).join('')}
-          <td class="money">${money(totalGrossSum)}</td>
-          <td class="money">${money(totalLabCostSum)}</td>
-          <td class="money">-</td>
-          <td class="money"><span class="badge bad">${money(totalLabDeductSum)}</span></td>
-          <td class="money">${money(totalEquipCostSum)}</td>
-          <td class="money">-</td>
-          <td class="money"><span class="badge bad">${money(totalEquipDeductSum)}</span></td>
-          <td class="money"><span class="badge ok">${money(totalNetPaySum)}</span></td>
-        </tr>
+          <td class="money c-equip"><span class="badge bad">${money(r.equipDeduct)}</span></td>
+          <td class="money c-net"><span class="badge ok">${money(r.netPay)}</span></td>
+        </tr>`;
+      }).join('')}
+
+      <!-- Total Row -->
+      <tr style="font-weight: bold;">
+        <td class="row-num"></td>
+        <td>รวมทุกราย</td>
+        ${branchNames.map(b => `<td class="money c-df">${money(totalSumByBranch[b])}</td>`).join('')}
+        <td class="money c-total">${money(totalGrossSum)}</td>
+        ${branchNames.map(b => `<td class="money c-lab">${money(totalLabByBranch[b])}</td>`).join('')}
+        <td class="money c-lab">${money(totalLabCostSum)}</td>
+        <td class="money c-deduct">—</td>
+        <td class="money c-deduct"><span class="badge bad">${money(totalLabDeductSum)}</span></td>
+        <td class="money c-equip">${money(totalEquipCostSum)}</td>
+        <td class="money c-equip">—</td>
+        <td class="money c-equip"><span class="badge bad">${money(totalEquipDeductSum)}</span></td>
+        <td class="money c-net"><span class="badge ok">${money(totalNetPaySum)}</span></td>
+      </tr>
     </tbody>`;
         }
 
@@ -2023,7 +2113,7 @@
         }
 
         function clearAll() {
-            rawRows = []; branchRows = []; doctorRows = []; branchNames = []; labState = {}; equipState = {}; labRows = []; unmatchedLabRows = {};
+            rawRows = []; branchRows = []; doctorRows = []; branchNames = []; labState = {}; equipState = {}; labRows = []; unmatchedLabRows = {}; labBranchMap = {};
             document.getElementById('fileInput').value = '';
             document.getElementById('labFileInput').value = '';
             document.getElementById('resultPanel').style.display = 'none';
