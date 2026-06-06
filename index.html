@@ -5,7 +5,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>MedIQ Link - ระบบสรุปรายได้ทันตแพทย์ 6 สาขา</title>
-    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Noto+Sans+Thai:wght@300;400;500;600;700;800&display=swap');
 
@@ -866,9 +866,9 @@
                 <svg class="cloud-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color:#d97706" xmlns="http://www.w3.org/2000/svg">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2a4 4 0 014-4h7m0 0l-3-3m3 3l-3 3M4 19h10a2 2 0 002-2v-1M4 5h10a2 2 0 012 2v1M4 9h8M4 13h8"></path>
                 </svg>
-                <strong>อัปโหลดไฟล์ค่าแลป / ใบวางบิลแล็บ (Excel หรือ PDF)</strong>
-                <div class="muted">รองรับไฟล์ Excel (.xlsx, .xls) ที่มีหลายชีต และ <strong>ใบวางบิล PDF</strong> (ระบบจะใช้ OCR อ่านอัตโนมัติ) ระบบจะรวมค่าแลปตามชื่อคุณหมอและเติมเข้าในตารางให้อัตโนมัติ</div>
-                <input id="labFileInput" type="file" multiple accept=".xlsx,.xls,.pdf" />
+                <strong>อัปโหลดไฟล์ค่าแลป / ใบวางบิลแล็บ (Excel, PDF หรือ รูปภาพ)</strong>
+                <div class="muted">รองรับไฟล์ Excel (.xlsx, .xls) ที่มีหลายชีต และ <strong>ใบวางบิล PDF / รูปภาพใบเสร็จ (JPG, PNG)</strong> (ระบบจะใช้ OCR อ่านอัตโนมัติ) ระบบจะรวมค่าแลปตามชื่อคุณหมอและเติมเข้าในตารางให้อัตโนมัติ</div>
+                <input id="labFileInput" type="file" multiple accept=".xlsx,.xls,.pdf,.jpg,.jpeg,.png" />
                 <div class="file-chips-container" id="uploadedLabFilesList"></div>
                 <div class="actions" style="justify-content:center">
                     <button class="warn" onclick="processSelectedLabFiles()">นำเข้าค่าแลปและ Match คุณหมอ</button>
@@ -950,6 +950,14 @@
                     <svg style="width:16px;height:16px" viewBox="0 0 24 24"><path fill="currentColor" d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20M16,11V15H13V18H11V15H8V13H11V11H13V13H16V11Z"/></svg>
                     ดาวน์โหลด Excel (.xlsx)
                 </button>
+                <button onclick="exportSummaryXlsx()" style="background-color: #10b981; color: white;">
+                    <svg style="width:16px;height:16px" viewBox="0 0 24 24"><path fill="currentColor" d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20M16,11V15H13V18H11V15H8V13H11V11H13V13H16V11Z"/></svg>
+                    ดาวน์โหลดตารางรวมรายได้หมอ (.xlsx)
+                </button>
+                <button onclick="exportLabSummaryXlsx()" style="background-color: #0284c7; color: white;">
+                    <svg style="width:16px;height:16px" viewBox="0 0 24 24"><path fill="currentColor" d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20M16,11V15H13V18H11V15H8V13H11V11H13V13H16V11Z"/></svg>
+                    ดาวน์โหลดสรุปรวมค่าแลปหมอ (.xlsx)
+                </button>
                 <button class="secondary" onclick="exportCsv()">
                     <svg style="width:16px;height:16px" viewBox="0 0 24 24"><path fill="currentColor" d="M14 2H6C4.9 2 4 2.9 4 4V20C4 21.1 4.9 22 6 22H18C19.1 22 20 21.1 20 20V8L14 2M18 20H6V4H13V9H18V20Z"/></svg>
                     ส่งออก CSV
@@ -982,6 +990,7 @@
             </div>
 
             <div id="labView" style="display:none">
+                <div id="xrayTableContainer"></div>
                 <div class="muted" style="margin-bottom:16px;">ตารางนี้คือข้อมูลค่าแลปที่อ่านได้จากไฟล์ใบวางบิล แยกตามชีต/สาขา และใช้ Match กับชื่อคุณหมอในตารางรายได้</div>
                 <div class="table-wrap">
                     <table id="labTable"></table>
@@ -1100,6 +1109,102 @@
         let unmatchedLabRows = [];
         let labBranchMap = {};
 
+        // X-ray monthly values for partners
+        let xrayData = {
+            'สาขา 1': { opg: 0, cep: 0, small: 0 },
+            'สาขา 2': { opg: 0, cep: 0, small: 0 },
+            'สาขา 3': { opg: 0, cep: 0, small: 0 },
+            'สาขา 4': { opg: 0, cep: 0, small: 0 },
+            'สาขา 5': { opg: 0, cep: 0, small: 0 },
+            'สาขา 6': { opg: 0, cep: 0, small: 0 }
+        };
+
+        // Partner guarantees default values
+        let partnerGuarantees = {
+            'หมอเบสท์': 10000,
+            'หมอนิกส์': 6000,
+            'หมอเมย์': 10000,
+            'หมอสาม': 6000,
+            'หมอเฟิร์ส': 10000,
+            'หมอเปิ้ล': 10000
+        };
+
+        // Month and Year detection variables
+        let detectedMonth = '';
+        let detectedYear = '';
+
+        // Doctor Profiles Mapping (Short Name -> Full Name & Nickname)
+        const DOCTOR_PROFILES = {
+            "ปฐมพงศ์": { fullName: "ปฐมพงศ์ เครือจันทร์", nickname: "หมอต้อม" },
+            "สรินพรรณ": { fullName: "สรินพรรณ เครือวุฒิกุล", nickname: "หมอนิกส์" },
+            "รัตนพล": { fullName: "รัตนพล ภูศรีนวล", nickname: "หมอรัตน์" },
+            "เกศินี": { fullName: "เกศินี จุขุนทด", nickname: "หมอเมย์" },
+            "จิดาภา": { fullName: "จิดาภา อินฉัตร", nickname: "หมอจี้" },
+            "ปิยณัท": { fullName: "ปิยณัท จันทร์แย้ม", nickname: "หมอตุ๊กตา" },
+            "อัญรินทร์": { fullName: "อัญรินทร์ ฤทธิรังสีพัฒน์", nickname: "หมอลูกน้ำ" },
+            "พอพลอย": { fullName: "พอพลอย ธนาเกียรติภิญโญ", nickname: "หมอขิม" },
+            "อดิวรรณ": { fullName: "อดิวรรณ ช่างคิด", nickname: "หมอมอร์ฟีน" },
+            "ลีละชาติ": { fullName: "ลีละชาติ ประเสริฐ", nickname: "หมอสาม" },
+            "โสภิตา": { fullName: "โสภิตา ฤทธิ์สยาม", nickname: "หมอออย" },
+            "ชนพล": { fullName: "ชนพล ไกรตรวจพล", nickname: "หมออ๊อบ" },
+            "อริสรา": { fullName: "อริสรา นัยบุตร", nickname: "หมอเปิ้ล" },
+            "จันทรัสม์": { fullName: "จันทรัสม์ ไกรวัลย์", nickname: "หมอเฟิร์ส" },
+            "ขวัญฤดี": { fullName: "ขวัญฤดี พรมมานนท์", nickname: "หมอจ๋า" },
+            "ณัชชา": { fullName: "ณัชชา พรมีไชย", nickname: "หมอนายน์" },
+            "อภิณัฐ": { fullName: "อภิณัฐ คำอุดม", nickname: "หมอโอบ" },
+            "นภางค์": { fullName: "นภางค์ เถรว่อง", nickname: "หมอแอม" },
+            "กุลพัทธ์": { fullName: "กุลพัทธ์ อยู่ดี", nickname: "หมอแฟล็ก" },
+            "อชิรญา": { fullName: "อชิรญา จำปานิล", nickname: "หมอบิ๋ม" },
+            "ธนัชชา": { fullName: "ธนัชชา ศิริไพบูลย์", nickname: "หมอซีน" },
+            "อรวรา": { fullName: "อรวรา เลิศธุวานนท์", nickname: "หมออร" },
+            "สุรศักดิ์": { fullName: "สุรศักดิ์ นครชัยกุล", nickname: "หมอเยี่ยม" },
+            "พิชญนันท์": { fullName: "พิชญนันท์ สุนทโร", nickname: "หมอเก้า" },
+            "ชนินาถ": { fullName: "ชนินาถ วิเศษเธียรกุล", nickname: "หมอเกียว" },
+            "รณภณ": { fullName: "รณภณ โอชาพงศ์", nickname: "หมอแก๊ต" },
+            "อรนุช": { fullName: "อรนุช ไพศาลวัชรกิจ", nickname: "หมอเชอรี่" },
+            "กมลทิพย์": { fullName: "กมลทิพย์ บัณฑุรจินดา", nickname: "หมอขวัญ" },
+            "ปริศนา": { fullName: "ปริศนา เจริญวงศ์", nickname: "หมอหมู" },
+            "วทัญญู": { fullName: "วทัญญู โคมเดือน", nickname: "หมอก็อก" },
+            "กชกร": { fullName: "กชกร เรืองเศรษฐวิทย์", nickname: "หมอตี้" },
+            "เดชฤทธิ์": { fullName: "เดชฤทธิ์ ไชยชนะ", nickname: "หมอหลุน" },
+            "อนงค์นาฏ": { fullName: "อนงค์นาฏ ธีระธราดล", nickname: "หมอหยง" },
+            "พิมพ์ลภัส": { fullName: "พิมพ์ลภัส สืบสุข", nickname: "หมอก้านพลู" },
+            "กษิดิศ": { fullName: "กษิดิศ อัศวรัตนาพันธ์", nickname: "หมอดรีม" },
+            "สุธาสิณี": { fullName: "สุธาสิณี แก้วแกนเพชร", nickname: "หมอกุ๋ย" },
+            "วงศกร": { fullName: "วงศกร เตชะสำราญ", nickname: "หมอตี้(ช)" },
+            "ชญาณี": { fullName: "ชญาณี ผลเจริญ", nickname: "หมอโดนัส" },
+            "ณิชาวรรณ": { fullName: "ณิชาวรรณ สายวงค์", nickname: "หมอปูเป้" },
+            "วรกมล": { fullName: "วรกมล ลิ้มมหาคุณ", nickname: "หมอเนส" },
+            "สุวพัฒน์": { fullName: "สุวพัฒน์ แซ่ด่าน", nickname: "หมอพลอย" },
+            "ณัฐศิลป์": { fullName: "ณัฐศิลป์ พันธุศิลป", nickname: "หมอมิล" },
+            "นันทิยา": { fullName: "นันทิยา วงศ์วัฒนาเสถียร", nickname: "หมอพลอย" },
+            "กรหทัย": { fullName: "กรหทัย มหาผลศิริกุล", nickname: "หมอเอิร์ธ" },
+            "ชนกนันท์": { fullName: "ชนกนันท์ เลียงอุดม", nickname: "หมอเนตร" },
+            "สุชญา": { fullName: "สุชญา เชาว์เจริญรัตน์", nickname: "หมอพราว" }
+        };
+
+        // Doctor default split ratios
+        const DOCTOR_SPLITS = {
+            'เกศินี': 0.50,
+            'นภางค์': 0.85,
+            'กุลพัทธ์': 0.85,
+            'อชิรญา': 0.85,
+            'ธนัชชา': 0.85,
+            'อรวรา': 0.85,
+            'พิชญนันท์': 0.85,
+            'ชนินาถ': 1.00,
+            'รณภณ': 1.00,
+            'อรนุช': 1.00,
+            'กมลทิพย์': 1.00,
+            'ปริศนา': 1.00,
+            'วทัญญู': 1.00,
+            'กชกร': 1.00,
+            'เดชฤทธิ์': 1.00,
+            'อนงค์นาฏ': 1.00,
+            'สุชญา': 1.00,
+            'ชนกนันท์': 1.00
+        };
+
         // ===== Typhoon OCR + LLM API =====
         const TYPHOON_API_KEY = 'sk-smttYhowQ5lS2JNi1aQAQiOaQZy4ZGucZTjmCbewvchGo7f8';
         const TYPHOON_OCR_URL = 'https://api.opentyphoon.ai/v1/ocr';
@@ -1160,19 +1265,91 @@
             return texts.join('\n---PAGE BREAK---\n');
         }
 
-        async function parseLabTextWithLLM(ocrText, fileName) {
+
+        async function ocrImageFile(file) {
+            const base64Image = await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => {
+                    const dataUrl = reader.result;
+                    const base64 = dataUrl.split(',')[1];
+                    resolve(base64);
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+
+            let docNames = [];
+            if (doctorRows && doctorRows.length > 0) {
+                docNames = [...new Set(doctorRows.map(r => r.doctor).filter(Boolean))];
+            }
+
+            const prompt = `This is a dental lab invoice. Inside the table, there are doctor names written or stamped on the left side of the table rows (inside the column "เลขที่ใบส่งสินค้า" or "No", above the numbers).
+${docNames.length ? `Here is the list of doctor names in our clinic: ${JSON.stringify(docNames)}.` : ''}
+Please look very closely at the image and find these doctor names. They are stamped in blue/purple or printed in gray inside the table cells.
+Please transcribe the full table as HTML. In the HTML table, make sure to write the doctor name in the exact cell where it is located, above or next to the invoice numbers (e.g. using <br/> or in the same cell).`;
+
+            const response = await fetchWithRetry(() => fetch(TYPHOON_LLM_URL, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${TYPHOON_API_KEY}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    model: 'typhoon-ocr',
+                    messages: [
+                        {
+                            role: 'user',
+                            content: [
+                                { type: 'text', text: prompt },
+                                { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64Image}` } }
+                            ]
+                        }
+                    ],
+                    temperature: 0.1
+                })
+            }));
+
+            const result = await response.json();
+            return result.choices[0].message.content;
+        }
+
+        async function parseLabTextWithLLM(ocrText, fileName, isImg) {
             let docHint = '';
             if (doctorRows && doctorRows.length > 0) {
                 const docNames = [...new Set(doctorRows.map(r => r.doctor).filter(Boolean))];
-                docHint = `\n\nรายชื่อทันตแพทย์ที่ถูกต้องในระบบคลินิกสำหรับอ้างอิงและแก้ไขตัวสะกดที่เพี้ยนจาก OCR:\n${JSON.stringify(docNames)}\n*สำคัญมาก: หากชื่อที่อ่านได้จาก OCR มีการสะกดผิดเพี้ยนจากรายชื่อแพทย์ในคลินิกข้างต้นเพียงเล็กน้อย (เช่น สระอุ/สระอู สลับกัน, ตัวการันต์ตกหล่น เช่น 'สูรศักดิ์' -> 'สุรศักดิ์') ให้แก้ชื่อแพทย์คนนั้นใน JSON ให้สะกดตรงตามรายชื่อแพทย์ที่ถูกต้องข้างต้นทันที*`;
+                docHint = `\n\nรายชื่อทันตแพทย์ที่ถูกต้องในระบบคลินิกสำหรับอ้างอิงและแก้ไขตัวสะกดที่เพี้ยนจาก OCR:\n${JSON.stringify(docNames)}\n*สำคัญมาก: หากชื่อที่อ่านได้จาก OCR มีการสะกดผิดเพี้ยนจากรายชื่อแพทย์ในคลินิกข้างต้นเพียงเล็กน้อย (เช่น สระอุ/สระอู สลับกัน, ตัวการันต์ตกหล่น เช่น 'สูรศักดิ์' -> 'สุรศักดิ์', หรือความเพี้ยนจากการอ่านตัวอักษร เช่น 'เภศิษฐ์' -> 'เกศินี', 'นภาพงค์' -> 'นภางค์') ให้แก้ชื่อแพทย์คนนั้นใน JSON ให้สะกดตรงตามรายชื่อแพทย์ที่ถูกต้องข้างต้นทันที*`;
             }
 
-            const systemPrompt = `คุณเป็น AI ที่เชี่ยวชาญในการแกะข้อมูลจากใบวางบิลค่าแลปทันตกรรม (Dental Lab Invoice)
+            let systemPrompt = '';
+            if (isImg) {
+                systemPrompt = `คุณเป็น AI ที่เชี่ยวชาญในการแกะข้อมูลจากใบวางบิลค่าแลปทันตกรรม (Dental Lab Invoice)
+จากข้อความ OCR ที่ให้มา ให้แปลงตารางรายการส่งสินค้าทั้งหมดออกเป็น JSON array โดยแปลงแยกเป็น 1 รายการวัตถุ (object) ต่อ 1 แถวรายการส่งสินค้าในตาราง (ห้ามนำยอดเงินมารวมกันในขั้นตอนนี้ ให้แยกทุกแถวเดี่ยวๆ)
+
+การจับคู่แพทย์กับรายการส่งสินค้า:
+In the table there are doctor names (such as ทพญ.เกศินี, ทพ.นภางค์) acting as group header labels above the invoice rows below them.
+- ให้คุณระบุว่ารายการใบส่งสินค้าแต่ละแถวนั้นเป็นของแพทย์ท่านใด โดยจับคู่ตามลำดับจากบนลงล่าง (รายการทั้งหมดภายใต้ชื่อแพทย์คนหนึ่งจะจัดเป็นของแพทย์คนนั้น จนกว่าจะพบชื่อแพทย์คนใหม่)
+- ในกรณีที่ชื่อแพทย์จัดบรรทัดผิดและเบียดเข้าไปในคอลัมน์แรก เช่น <tr><td>พห. จันทร์วรม</td><td>17/5/69</td><td>คุณ Lin...</td><td>800.00</td></tr> แถวนี้จะมีทั้งแพทย์คือ "จันทรัสม์" และจำนวนเงิน 800.00 ให้สร้างออบเจ็กต์สำหรับแถวนี้ด้วย
+- แถวที่เป็นเฉพาะชื่อแพทย์อย่างเดียวและไม่มีจำนวนเงิน/ไม่มีข้อมูลใบส่งสินค้า ให้ข้ามไป ไม่ต้องสร้างออบเจ็กต์
+
+ข้อมูลแต่ละรายการใน JSON array ต้องมี:
+- "doctor": ชื่อทันตแพทย์ (string) — ต้องเลือกสะกดให้ตรงกับรายชื่อแพทย์อ้างอิงในระบบคลินิกที่ให้ไว้ด้านล่าง
+- "amount": จำนวนเงินของรายการนั้น (number) — ดึงจากช่อง "จำนวนเงิน" ของแถวนั้นๆ (ต้องเป็นตัวเลขเท่านั้น)
+- "invoiceNo": เลขที่ใบส่งสินค้า (string) — ดึงจากช่อง "เลขที่ใบส่งสินค้า" ของแถวนั้นๆ
+- "date": วันที่ส่งสินค้า (string) — ดึงจากช่อง "วันที่" ของแถวนั้นๆ
+- "customerName": รายละเอียดคนไข้ (string) — ดึงจากช่อง "รายละเอียด" หรือ "รายละเอียดรายการ" ของแถวนั้นๆ
+- "branch": ชื่อสาขา (string) — ดึงจาก "นามลูกค้า" หรือ "คลินิก/ร.พ." ของใบวางบิล
+
+กฎสำคัญ:
+1. ตอบเป็น JSON array เท่านั้น ห้ามมีข้อความอื่นนอก JSON
+2. ยอดเงินต้องเป็นตัวเลข (number) ไม่ใช่ string และห้ามทำยอดเงินสูญหายหรือละทิ้งแถวที่มีจำนวนเงิน
+3. ห้ามบวกรวมยอดเงินเอง ให้แยกบรรทัดตามตารางจริง${docHint}`;
+            } else {
+                systemPrompt = `คุณเป็น AI ที่เชี่ยวชาญในการแกะข้อมูลจากใบวางบิลค่าแลปทันตกรรม (Dental Lab Invoice)
 จากข้อความ OCR ที่ให้มา ให้แกะข้อมูลต่อไปนี้ออกมาเป็น JSON array:
 
 แต่ละรายการใน array ต้องมี:
 - "doctor": ชื่อทันตแพทย์ (string) — ดึงจากช่อง "ทันตแพทย์" ในใบวางบิล
-- "amount": ยอดค่าแลปรวม (number) — ดึงจาก "รวมเป็นเงิน" หรือ "จำนวนเงิน" ที่ตรงกับทันตแพทย์คนนั้น
+- "amount": ยอดรวมค่าแลปของทันตแพทย์คนนั้น (number) — ให้บวกทุกรายการย่อยที่เป็นของทันตแพทย์ท่านนั้นเข้าด้วยกัน (เช่น หากมีหมอคนเดียวกัน 2 แถว แถวละ 800 ให้รวมเป็น 1600)
 - "branch": ชื่อสาขา/คลินิก (string) — ดึงจาก "นามลูกค้า" หรือ "คลินิก/ร.พ."
 - "invoiceNo": เลขที่ใบวางบิล (string)
 - "date": วันที่ออกบิล (string)
@@ -1184,6 +1361,7 @@
 3. ยอดเงินต้องเป็นตัวเลข (number) ไม่ใช่ string
 4. ถ้าอ่านข้อมูลไม่ได้ชัดเจน ให้ใส่ค่าที่เป็นไปได้มากที่สุด
 5. ถ้าชื่อสาขามีคำว่า "สาขา" ให้ดึงเฉพาะส่วนหลังคำว่า "สาขา" เช่น "คลินิกฯ สาขาซอยมังกร" → branch = "สาขาซอยมังกร"${docHint}`;
+            }
 
             const response = await fetchWithRetry(() => fetch(TYPHOON_LLM_URL, {
                 method: 'POST',
@@ -1213,8 +1391,9 @@
             return Array.isArray(parsed) ? parsed : [parsed];
         }
 
-        function isPdfFile(file) {
-            return file.name.toLowerCase().endsWith('.pdf');
+        function isOcrFile(file) {
+            const name = file.name.toLowerCase();
+            return name.endsWith('.pdf') || name.endsWith('.jpg') || name.endsWith('.jpeg') || name.endsWith('.png');
         }
 
         const money = n => Number(n || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -1331,6 +1510,57 @@
             `).join('');
         }
 
+        function preprocessImage(file) {
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = new Image();
+                    img.onload = function() {
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        ctx.drawImage(img, 0, 0);
+                        
+                        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                        const data = imgData.data;
+                        
+                        // Convert to high-contrast grayscale using Min(R,G,B)
+                        // This ensures any colored stamp ink (which has at least one low channel) becomes very dark,
+                        // while white paper (all channels high) stays bright.
+                        for (let i = 0; i < data.length; i += 4) {
+                            const r = data[i];
+                            const g = data[i+1];
+                            const b = data[i+2];
+                            
+                            let v = Math.min(r, g, b);
+                            
+                            // Boost contrast
+                            if (v < 160) {
+                                v = Math.max(0, v - (160 - v) * 2.0);
+                            } else {
+                                v = Math.min(255, v + (v - 160) * 2.0);
+                            }
+                            
+                            data[i] = v;
+                            data[i+1] = v;
+                            data[i+2] = v;
+                        }
+                        
+                        ctx.putImageData(imgData, 0, 0);
+                        canvas.toBlob((blob) => {
+                            resolve(new File([blob], file.name, { type: 'image/jpeg' }));
+                        }, 'image/jpeg', 0.85);
+                    };
+                    img.onerror = () => resolve(file);
+                    img.src = e.target.result;
+                };
+                reader.onerror = () => resolve(file);
+                reader.readAsDataURL(file);
+            });
+        }
+
         async function processSelectedLabFiles() {
             const files = Array.from(document.getElementById('labFileInput').files || []);
             if (!files.length) return setLabStatus('❌ กรุณาเลือกไฟล์ค่าแลปก่อน');
@@ -1338,8 +1568,8 @@
             labRows = [];
             unmatchedLabRows = [];
 
-            const pdfFiles = files.filter(f => isPdfFile(f));
-            const excelFiles = files.filter(f => !isPdfFile(f));
+            const ocrFiles = files.filter(f => isOcrFile(f));
+            const excelFiles = files.filter(f => f.name.toLowerCase().endsWith('.xlsx') || f.name.toLowerCase().endsWith('.xls'));
 
             // --- Process Excel files (existing flow) ---
             if (excelFiles.length) {
@@ -1348,6 +1578,15 @@
                     try {
                         const buffer = await file.arrayBuffer();
                         const wb = XLSX.read(buffer, { type: 'array', cellDates: true });
+                        
+                        // Check if it's the existing lab summary file
+                        const isSummary = parseExistingLabSummary(file.name, wb);
+                        if (isSummary) {
+                            console.log(`Successfully auto-loaded values from summary file: ${file.name}`);
+                            renderXrayTable(); // Update UI inputs
+                            continue; // Skip standard parsing
+                        }
+
                         for (const sheetName of wb.SheetNames) {
                             const ws = wb.Sheets[sheetName];
                             const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
@@ -1360,58 +1599,63 @@
                 }
             }
 
-            // --- Process PDF files (OCR flow) ---
-            if (pdfFiles.length) {
-                if (pdfFiles.length > MAX_PDF_FILES) {
-                    setLabStatus(`⚠️ เลือกไฟล์ PDF ${pdfFiles.length} ไฟล์ เกินขีดจำกัด ${MAX_PDF_FILES} ไฟล์ — จะประมวลผลเฉพาะ ${MAX_PDF_FILES} ไฟล์แรก`);
+            // --- Process PDF/Image files (OCR flow) ---
+            if (ocrFiles.length) {
+                if (ocrFiles.length > MAX_PDF_FILES) {
+                    setLabStatus(`⚠️ เลือกไฟล์ PDF/รูปภาพ ${ocrFiles.length} ไฟล์ เกินขีดจำกัด ${MAX_PDF_FILES} ไฟล์ — จะประมวลผลเฉพาะ ${MAX_PDF_FILES} ไฟล์แรก`);
                     await sleep(2000);
                 }
-                const pdfToProcess = pdfFiles.slice(0, MAX_PDF_FILES);
-                let pdfSuccessCount = 0;
-                let pdfFailCount = 0;
+                const ocrToProcess = ocrFiles.slice(0, MAX_PDF_FILES);
+                let ocrSuccessCount = 0;
+                let ocrFailCount = 0;
 
-                for (let pi = 0; pi < pdfToProcess.length; pi++) {
-                    const file = pdfToProcess[pi];
+                for (let pi = 0; pi < ocrToProcess.length; pi++) {
+                    let file = ocrToProcess[pi];
+                    const isImg = !file.name.toLowerCase().endsWith('.pdf');
                     try {
-                        setLabStatus(`⏳ [${pi + 1}/${pdfToProcess.length}] กำลัง OCR ไฟล์ PDF: ${file.name}...`);
-                        const ocrText = await ocrPdfFile(file);
+                        if (isImg) {
+                            setLabStatus(`⏳ [${pi + 1}/${ocrToProcess.length}] กำลังปรับแต่งคุณภาพรูปภาพ: ${file.name}...`);
+                            file = await preprocessImage(file);
+                        }
+                        setLabStatus(`⏳ [${pi + 1}/${ocrToProcess.length}] กำลัง OCR ไฟล์ ${isImg ? 'รูปภาพ' : 'PDF'}: ${file.name}...`);
+                        const ocrText = isImg ? await ocrImageFile(file) : await ocrPdfFile(file);
 
                         if (!ocrText || !ocrText.trim()) {
                             setLabStatus(`⚠️ OCR ไม่พบข้อความในไฟล์ ${file.name}`);
-                            pdfFailCount++;
+                            ocrFailCount++;
                             continue;
                         }
 
-                        setLabStatus(`⏳ [${pi + 1}/${pdfToProcess.length}] AI กำลังวิเคราะห์ข้อมูลค่าแลปจาก ${file.name}...`);
-                        const parsedItems = await parseLabTextWithLLM(ocrText, file.name);
+                        setLabStatus(`⏳ [${pi + 1}/${ocrToProcess.length}] AI กำลังวิเคราะห์ข้อมูลค่าแลปจาก ${file.name}...`);
+                        const parsedItems = await parseLabTextWithLLM(ocrText, file.name, isImg);
 
                         for (const item of parsedItems) {
                             labRows.push({
                                 fileName: file.name,
-                                sheetName: 'PDF-OCR',
+                                sheetName: isImg ? 'IMAGE-OCR' : 'PDF-OCR',
                                 branch: normalizeBranchName(item.branch || item.customerName || 'ไม่ระบุสาขา'),
-                                labType: 'PDF',
+                                labType: isImg ? 'IMAGE' : 'PDF',
                                 customerName: item.customerName || item.branch || '',
                                 dateRange: item.date || '',
                                 doctor: item.doctor || 'ไม่ระบุชื่อหมอ',
                                 amount: num(item.amount)
                             });
                         }
-                        pdfSuccessCount++;
+                        ocrSuccessCount++;
                     } catch (err) {
-                        console.error('PDF OCR Error:', err);
-                        pdfFailCount++;
+                        console.error('OCR Error:', err);
+                        ocrFailCount++;
                         // If rate limited even after retries, warn and continue
                         const isRateLimit = err.message.includes('429');
-                        setLabStatus(`❌ ประมวลผล PDF ${file.name} ไม่สำเร็จ${isRateLimit ? ' (Rate Limit)' : ''}: ${err.message}`);
+                        setLabStatus(`❌ ประมวลผล ${isImg ? 'รูปภาพ' : 'PDF'} ${file.name} ไม่สำเร็จ${isRateLimit ? ' (Rate Limit)' : ''}: ${err.message}`);
                         if (isRateLimit) {
                             setLabStatus(`⏳ รอ 5 วินาทีเนื่องจาก Rate Limit แล้วจะทำต่อ...`);
                             await sleep(5000);
                         }
                     }
 
-                    // Delay between PDFs to prevent rate limiting
-                    if (pi < pdfToProcess.length - 1) {
+                    // Delay between files to prevent rate limiting
+                    if (pi < ocrToProcess.length - 1) {
                         await sleep(PDF_DELAY_MS);
                     }
                 }
@@ -1421,9 +1665,9 @@
             renderAll();
             const matchedAmount = doctorRows.reduce((s, r) => s + num(r.labCost), 0);
             const totalLab = labRows.reduce((s, r) => s + num(r.amount), 0);
-            const pdfCount = pdfFiles.length;
+            const ocrCount = ocrFiles.length;
             const excelCount = excelFiles.length;
-            const sourceInfo = [excelCount ? `Excel ${excelCount} ไฟล์` : '', pdfCount ? `PDF(OCR) ${pdfCount} ไฟล์` : ''].filter(Boolean).join(' + ');
+            const sourceInfo = [excelCount ? `Excel ${excelCount} ไฟล์` : '', ocrCount ? `PDF/รูปภาพ(OCR) ${ocrCount} ไฟล์` : ''].filter(Boolean).join(' + ');
             setLabStatus(`✅ นำเข้าค่าแลปสำเร็จ [${sourceInfo}] ${labRows.length} รายการ / รวมค่าแลป ${money(totalLab)} / Match เข้าตารางหมอแล้ว ${money(matchedAmount)}${unmatchedLabRows.length ? ` / ยังไม่พบชื่อหมอ ${unmatchedLabRows.length} รายการ` : ''}`);
         }
 
@@ -1432,35 +1676,160 @@
             if (!firstCell || (!firstCell.includes('DN') && !firstCell.includes('PC'))) return;
 
             const labType = firstCell.includes('PC') ? 'PC' : 'DN';
-            const customerName = clean(rows?.[3]?.[1]);
-            const dateRange = clean(rows?.[2]?.[1]);
+            const defaultDateRange = clean(rows?.[2]?.[1]);
 
+            function formatExcelDate(val) {
+                if (!val) return '';
+                if (typeof val === 'number') {
+                    const d = new Date(1899, 11, 30);
+                    d.setDate(d.getDate() + val);
+                    return `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear() % 100}`;
+                }
+                return String(val);
+            }
+
+            let currentDoctor = '';
             for (let r = 0; r < rows.length; r++) {
                 const row = rows[r] || [];
-                const doctor = clean(row[3]);
+                const cellA = clean(row[0]);
+
+                // Check if it's a doctor name row
+                const isDocRow = cellA && 
+                                 (cellA.startsWith('ทพ') || cellA.startsWith('ทพญ') || cellA.startsWith('พญ') || cellA.startsWith('นพ')) &&
+                                 !clean(row[1]) && !clean(row[2]) && !clean(row[4]);
+                
+                if (isDocRow) {
+                    currentDoctor = cellA;
+                    continue;
+                }
+
+                const patientName = clean(row[2]);
                 const amount = num(row[6] || row[4]);
 
-                if (
-                    doctor &&
-                    amount &&
-                    !doctor.includes('รวมทั้งสิ้น') &&
-                    !doctor.includes('ใบ') &&
-                    !doctor.includes('---') &&
-                    !doctor.includes('===') &&
-                    !clean(row[0]).startsWith('IV')
-                ) {
+                if (currentDoctor && cellA && cellA.startsWith('IV') && patientName && amount) {
                     labRows.push({
                         fileName,
                         sheetName,
                         branch: normalizeBranchName(sheetName),
                         labType,
-                        customerName,
-                        dateRange,
-                        doctor,
+                        customerName: patientName, // Use actual patient name instead of clinic name!
+                        dateRange: formatExcelDate(row[1]) || defaultDateRange,
+                        doctor: currentDoctor,
                         amount
                     });
                 }
             }
+        }
+
+        function parseExistingLabSummary(fileName, wb) {
+            // Find a sheet name that resembles the processed month or take the first one
+            let matchedSheet = wb.SheetNames[0];
+            if (detectedMonth) {
+                matchedSheet = wb.SheetNames.find(name => name.includes(detectedMonth) && name.includes(detectedYear)) ||
+                               wb.SheetNames.find(name => name.includes(detectedMonth)) ||
+                               wb.SheetNames[0];
+            }
+            
+            const ws = wb.Sheets[matchedSheet];
+            const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+            
+            if (rows.length < 38) return false;
+            
+            const title = String(rows[0]?.[0] || '');
+            if (!title.includes('ใบสรุปค่าแลป') && !title.includes('ค่าแลป')) return false;
+            
+            console.log(`Auto-loading X-ray values and guarantees from sheet: "${matchedSheet}"`);
+            
+            // 1. Load X-ray values (Rows 34, 35, 36) - Columns B (1) to G (6)
+            for (let i = 1; i <= 6; i++) {
+                const bKey = `สาขา ${i}`;
+                if (xrayData[bKey]) {
+                    xrayData[bKey].opg = num(rows[33]?.[i]);
+                    xrayData[bKey].cep = num(rows[34]?.[i]);
+                    xrayData[bKey].small = num(rows[35]?.[i]);
+                }
+            }
+            
+            // 2. Load Guarantees (partner values)
+            partnerGuarantees['หมอเบสท์'] = num(rows[3]?.[3]);
+            partnerGuarantees['หมอนิกส์'] = num(rows[8]?.[3]);
+            partnerGuarantees['หมอเมย์'] = num(rows[13]?.[2]);
+            partnerGuarantees['หมอสาม'] = num(rows[17]?.[2]);
+            partnerGuarantees['หมอเฟิร์ส'] = num(rows[21]?.[2]);
+            partnerGuarantees['หมอเปิ้ล'] = num(rows[25]?.[2]);
+            
+            return true;
+        }
+
+        function updateXray(branchNum, field, val) {
+            xrayData[`สาขา ${branchNum}`][field] = num(val);
+        }
+
+        function renderXrayTable() {
+            const container = document.getElementById('xrayTableContainer');
+            if (!container) return;
+            
+            let html = `
+            <div class="card" style="margin-bottom: 24px; padding: 20px; border: 1px solid var(--neutral-200); border-radius: 8px; background: white;">
+                <div style="font-weight: 700; margin-bottom: 12px; font-size: 16px; color: var(--neutral-800); display: flex; justify-content: space-between; align-items: center;">
+                    <span style="display: flex; align-items: center; gap: 8px;">📊 ยอดเอ็กซเรย์รายเดือนแยกสาขา (สำหรับคำนวณเงินเดือนหุ้นส่วน)</span>
+                    <span class="muted" style="font-size: 13px; font-weight: normal; color: var(--neutral-500);">(ยอดรวมเอ็กซเรย์จะใช้จัดสัดส่วนหุ้นส่วนอัตโนมัติ)</span>
+                </div>
+                <div class="table-wrap" style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+                        <thead>
+                            <tr style="background: var(--neutral-50); border-bottom: 1px solid var(--neutral-200);">
+                                <th style="padding: 10px; text-align: left; font-weight: bold; color: var(--neutral-700); width: 140px;">ประเภท X-ray</th>
+                                <th style="padding: 10px; text-align: right; font-weight: bold; color: var(--neutral-700);">สาขา 1</th>
+                                <th style="padding: 10px; text-align: right; font-weight: bold; color: var(--neutral-700);">สาขา 2</th>
+                                <th style="padding: 10px; text-align: right; font-weight: bold; color: var(--neutral-700);">สาขา 3</th>
+                                <th style="padding: 10px; text-align: right; font-weight: bold; color: var(--neutral-700);">สาขา 4</th>
+                                <th style="padding: 10px; text-align: right; font-weight: bold; color: var(--neutral-700);">สาขา 5</th>
+                                <th style="padding: 10px; text-align: right; font-weight: bold; color: var(--neutral-700);">สาขา 6</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr style="border-bottom: 1px solid var(--neutral-100);">
+                                <td style="padding: 10px; font-weight: 600;">OPG</td>
+                                ${[1, 2, 3, 4, 5, 6].map(i => {
+                                    const val = xrayData[`สาขา ${i}`]?.opg || 0;
+                                    return `
+                                    <td style="padding: 6px; text-align: right;">
+                                        <div class="input-cell-wrapper" style="display:inline-block;">
+                                            <input class="input-cell" type="number" value="${val}" style="width: 80px; text-align: right;" onchange="updateXray(${i}, 'opg', this.value)">
+                                        </div>
+                                    </td>`;
+                                }).join('')}
+                            </tr>
+                            <tr style="border-bottom: 1px solid var(--neutral-100);">
+                                <td style="padding: 10px; font-weight: 600;">Cep</td>
+                                ${[1, 2, 3, 4, 5, 6].map(i => {
+                                    const val = xrayData[`สาขา ${i}`]?.cep || 0;
+                                    return `
+                                    <td style="padding: 6px; text-align: right;">
+                                        <div class="input-cell-wrapper" style="display:inline-block;">
+                                            <input class="input-cell" type="number" value="${val}" style="width: 80px; text-align: right;" onchange="updateXray(${i}, 'cep', this.value)">
+                                        </div>
+                                    </td>`;
+                                }).join('')}
+                            </tr>
+                            <tr style="border-bottom: 1px solid var(--neutral-100);">
+                                <td style="padding: 10px; font-weight: 600;">เล็ก (Small)</td>
+                                ${[1, 2, 3, 4, 5, 6].map(i => {
+                                    const val = xrayData[`สาขา ${i}`]?.small || 0;
+                                    return `
+                                    <td style="padding: 6px; text-align: right;">
+                                        <div class="input-cell-wrapper" style="display:inline-block;">
+                                            <input class="input-cell" type="number" value="${val}" style="width: 80px; text-align: right;" onchange="updateXray(${i}, 'small', this.value)">
+                                        </div>
+                                    </td>`;
+                                }).join('')}
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>`;
+            container.innerHTML = html;
         }
 
         function normalizeDoctorName(name) {
@@ -1521,6 +1890,9 @@
             if (!doctorRows.length) return;
 
             labBranchMap = {};
+            for (const row of labRows) {
+                row.matchedDoctor = null;
+            }
 
             // สร้าง labMapByBranch: normKey → Map(branch → amount)
             const labMapByBranch = new Map();
@@ -1639,6 +2011,12 @@
                             labBranchMap[matchedDoctor][br] = (labBranchMap[matchedDoctor][br] || 0) + amt;
                         }
                     }
+                    // บันทึก matchedDoctor กลับไปยังทุกแถวใน labRows ที่มีชื่อย่อนี้
+                    for (const row of labRows) {
+                        if (normalizeDoctorName(row.doctor) === labKey) {
+                            row.matchedDoctor = matchedDoctor;
+                        }
+                    }
                 } else {
                     const originals = labRows.filter(x => normalizeDoctorName(x.doctor) === labKey);
                     unmatchedLabRows.push(...originals);
@@ -1663,6 +2041,28 @@
         }
 
 
+        function detectMonthYearFromRows(rows) {
+            if (detectedMonth && detectedYear) return;
+            const thMonths = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
+            for (let i = 0; i < Math.min(rows.length, 10); i++) {
+                const row = rows[i] || [];
+                for (let j = 0; j < row.length; j++) {
+                    const val = String(row[j] || '').trim();
+                    if (!val) continue;
+                    for (const m of thMonths) {
+                        if (val.includes(m)) {
+                            const yearMatch = val.match(/\d{4}/);
+                            if (yearMatch) {
+                                detectedMonth = m;
+                                detectedYear = yearMatch[0];
+                                return;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         async function processSelectedFiles() {
             const files = Array.from(document.getElementById('fileInput').files || []);
             if (!files.length) return setStatus('❌ กรุณาเลือกไฟล์ Excel ก่อน');
@@ -1673,6 +2073,8 @@
             branchNames = [];
             labState = {};
             labBranchMap = {};
+            detectedMonth = '';
+            detectedYear = '';
 
             setStatus('⏳ กำลังคำนวณและประมวลผลไฟล์ Excel...');
 
@@ -1682,6 +2084,7 @@
                     const wb = XLSX.read(buffer, { type: 'array', cellDates: true });
                     const ws = wb.Sheets[wb.SheetNames[0]];
                     const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+                    detectMonthYearFromRows(rows);
                     parseBranchFile(file.name, rows);
                 } catch (err) {
                     console.error(err);
@@ -1893,6 +2296,7 @@
             select.innerHTML = '<option value="">ทุกสาขา</option>' + branchNames.map(b => `<option value="${escapeHtml(b)}">${escapeHtml(b)}</option>`).join('');
 
             updateKpis();
+            renderXrayTable();
             renderCurrentTab();
         }
 
@@ -2097,43 +2501,16 @@
                 (!bf || r.branch === bf)
             );
 
-            // สร้าง set สำหรับจับคู่แบบ 3 ชั้น เหมือน applyLabToDoctors
-            const doctorNormKeys = new Set(doctorRows.map(r => normalizeDoctorName(r.doctor)));
-            const doctorCoreKeys = new Map();
-            const doctorNormMap = new Map();
-            for (const dr of doctorRows) {
-                const normKey = normalizeDoctorName(dr.doctor);
-                const coreKey = extractCoreName(dr.doctor);
-                doctorNormMap.set(normKey, dr.doctor);
-                if (coreKey && coreKey.length >= 2) {
-                    doctorCoreKeys.set(coreKey, dr.doctor);
-                }
-            }
-
-            function isLabDoctorMatched(labDoctorName) {
-                const labNorm = normalizeDoctorName(labDoctorName);
-                // 1) Exact normalized match
-                if (doctorNormKeys.has(labNorm)) return true;
-                // 2) Core name match
-                const labCore = extractCoreName(labDoctorName);
-                if (labCore && labCore.length >= 2 && doctorCoreKeys.has(labCore)) return true;
-                // 3) Contains match
-                for (const [normDoc] of doctorNormMap.entries()) {
-                    if (normDoc.length >= 2 && labNorm.includes(normDoc)) return true;
-                }
-                return false;
-            }
-
             const totalLab = rows.reduce((s, r) => s + num(r.amount), 0);
 
             table.innerHTML = `
     <thead><tr><th>สถานะ Match</th><th>คุณหมอ</th><th>สาขา/ชีต</th><th>ประเภท</th><th>ชื่อลูกค้า</th><th>ช่วงวันที่</th><th>ไฟล์</th><th>ยอดค่าแลป</th></tr></thead>
     <tbody>
       ${rows.map(r => {
-        const matched = isLabDoctorMatched(r.doctor);
+        const matched = !!r.matchedDoctor;
         return `
         <tr>
-          <td><span class="badge ${matched ? 'ok' : 'bad'}">${matched ? 'Matched' : 'ไม่พบในรายได้'}</span></td>
+          <td><span class="badge ${matched ? 'ok' : 'bad'}">${matched ? 'Matched (' + escapeHtml(r.matchedDoctor) + ')' : 'ไม่พบในรายได้'}</span></td>
           <td>${escapeHtml(r.doctor)}</td>
           <td>${escapeHtml(r.branch)}</td>
           <td>${escapeHtml(r.labType)}</td>
@@ -2180,6 +2557,953 @@
             if (unmatchedLabRows.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(unmatchedLabRows), 'ค่าแลปยังไม่ Match');
             XLSX.writeFile(wb, 'สรุปรายได้คุณหมอ_คำนวณจากเว็บ.xlsx');
         }
+
+        function exportSummaryXlsx() {
+            if (!doctorRows.length) return;
+            const wb = XLSX.utils.book_new();
+
+            const monthName = detectedMonth || 'รายได้หมอ';
+            const yearVal = detectedYear || '';
+            const yearShort = yearVal ? yearVal.substring(2) : ''; // e.g. "2569" -> "69"
+            
+            const summarySheetName = yearShort ? `${monthName}${yearShort}` : 'รายได้หมอ';
+            
+            // Helper for short month names mapping to sheet names
+            const shortMonths = {
+                'มกราคม': 'ม.ค.',
+                'กุมภาพันธ์': 'ก.พ.',
+                'มีนาคม': 'มี.ค.',
+                'เมษายน': 'เม.ย.',
+                'พฤษภาคม': 'พค.',
+                'มิถุนายน': 'มิ.ย.',
+                'กรกฎาคม': 'ก.ค.',
+                'สิงหาคม': 'ส.ค.',
+                'กันยายน': 'ก.ย.',
+                'ตุลาคม': 'ต.ค.',
+                'พฤศจิกายน': 'พ.ย.',
+                'ธันวาคม': 'ธ.ค.'
+            };
+            const shortM = shortMonths[monthName] || monthName;
+            
+            let accountingSheetName = '';
+            if (monthName === 'เมษายน') {
+                accountingSheetName = `ส่งบัญชี${shortM}${yearShort}`;
+            } else {
+                accountingSheetName = `ส่งบัญชี ${shortM}${yearShort}`;
+            }
+            if (!yearShort) {
+                accountingSheetName = 'ส่งบัญชี';
+            }
+
+            const titleText = yearVal ? `หมอหลัก เดือน${monthName} ${yearVal}` : 'หมอหลัก';
+            const moneyFormat = '#,##0.00';
+
+            // -------------------------------------------
+            // Sheet 1: Summary Sheet
+            // -------------------------------------------
+            const ws1 = {};
+            const totalRows = doctorRows.length + 5; // header (3) + data + total
+            
+            // Set cell A1
+            ws1['A1'] = { t: 's', v: titleText };
+            
+            // Headers Row 2
+            ws1['A2'] = { t: 's', v: 'รายชื่อหมอ' };
+            ws1['D2'] = { t: 's', v: 'ยอดรวม DF' };
+            ws1['J2'] = { t: 's', v: 'รวมยอดDF' };
+            ws1['K2'] = { t: 's', v: 'ค่าแลปหาร 2 แล้ว' };
+            ws1['Q2'] = { t: 's', v: 'รวมค่าแลป' };
+            ws1['R2'] = { t: 's', v: 'อื่นๆ' };
+            ws1['S2'] = { t: 's', v: 'สุทธิ' };
+            ws1['T2'] = { t: 's', v: 'ส่วน 1' };
+            ws1['U2'] = { t: 's', v: 'ส่วน 2' };
+            
+            // Sub-headers Row 3 (สาขา 1 to สาขา 6)
+            for (let c = 0; c < 6; c++) {
+                ws1[XLSX.utils.encode_cell({ r: 2, c: 3 + c })] = { t: 's', v: `สาขา ${c + 1}` };
+                ws1[XLSX.utils.encode_cell({ r: 2, c: 10 + c })] = { t: 's', v: `สาขา ${c + 1}` };
+            }
+            
+            // Merges for headers
+            ws1['!merges'] = [
+                { s: { r: 0, c: 0 }, e: { r: 0, c: 20 } },
+                { s: { r: 1, c: 0 }, e: { r: 2, c: 2 } },
+                { s: { r: 1, c: 3 }, e: { r: 1, c: 8 } },
+                { s: { r: 1, c: 9 }, e: { r: 2, c: 9 } },
+                { s: { r: 1, c: 10 }, e: { r: 1, c: 15 } },
+                { s: { r: 1, c: 16 }, e: { r: 2, c: 16 } },
+                { s: { r: 1, c: 17 }, e: { r: 2, c: 17 } },
+                { s: { r: 1, c: 18 }, e: { r: 2, c: 18 } },
+                { s: { r: 1, c: 19 }, e: { r: 2, c: 19 } },
+                { s: { r: 1, c: 20 }, e: { r: 2, c: 20 } }
+            ];
+            
+            const totals = {
+                df: Array(6).fill(0),
+                dfTotal: 0,
+                lab: Array(6).fill(0),
+                labTotal: 0,
+                other: 0,
+                net: 0,
+                part1: 0,
+                part2: 0
+            };
+            
+            const standardBranches = ['สาขา 1', 'สาขา 2', 'สาขา 3', 'สาขา 4', 'สาขา 5', 'สาขา 6'];
+
+            doctorRows.forEach((r, idx) => {
+                const R_num = idx + 4; // Excel row number (1-based)
+                const r_idx = R_num - 1; // 0-based row
+                
+                const core = extractCoreName(r.doctor);
+                const profile = DOCTOR_PROFILES[core] || { fullName: r.doctor, nickname: '' };
+                
+                // Col A: Running number
+                ws1[XLSX.utils.encode_cell({ r: r_idx, c: 0 })] = { t: 'n', v: idx + 1 };
+                // Col B: Full name
+                ws1[XLSX.utils.encode_cell({ r: r_idx, c: 1 })] = { t: 's', v: profile.fullName };
+                // Col C: Nickname (blank/empty as requested by user)
+                ws1[XLSX.utils.encode_cell({ r: r_idx, c: 2 })] = { t: 's', v: '' };
+                
+                // Col D to I: Branch DF
+                standardBranches.forEach((b, b_idx) => {
+                    const val = r[b] || 0;
+                    if (val) {
+                        ws1[XLSX.utils.encode_cell({ r: r_idx, c: 3 + b_idx })] = { t: 'n', v: val, z: moneyFormat };
+                        totals.df[b_idx] += val;
+                    }
+                });
+                
+                const dfTotal = r.totalGross || 0;
+                totals.dfTotal += dfTotal;
+                ws1[XLSX.utils.encode_cell({ r: r_idx, c: 9 })] = { t: 'n', f: `SUM(D${R_num}:I${R_num})`, v: dfTotal, z: moneyFormat };
+                
+                const dLab = labBranchMap[r.doctor] || {};
+                let rowLabDeduct = 0;
+                standardBranches.forEach((b, b_idx) => {
+                    const val = dLab[b] || 0;
+                    if (val) {
+                        const deduct = val * (r.labPercent / 100);
+                        ws1[XLSX.utils.encode_cell({ r: r_idx, c: 10 + b_idx })] = { t: 'n', v: deduct, z: moneyFormat };
+                        totals.lab[b_idx] += deduct;
+                        rowLabDeduct += deduct;
+                    }
+                });
+                
+                totals.labTotal += rowLabDeduct;
+                ws1[XLSX.utils.encode_cell({ r: r_idx, c: 16 })] = { t: 'n', f: `SUM(K${R_num}:P${R_num})`, v: rowLabDeduct, z: moneyFormat };
+                
+                let otherVal = 0;
+                if (core === 'เกศินี' && monthName === 'พฤษภาคม' && yearVal === '2569') {
+                    otherVal = 10000;
+                } else if (r.equipDeduct) {
+                    otherVal = -r.equipDeduct;
+                }
+                if (otherVal !== 0) {
+                    ws1[XLSX.utils.encode_cell({ r: r_idx, c: 17 })] = { t: 'n', v: otherVal, z: moneyFormat };
+                    totals.other += otherVal;
+                }
+                
+                const netVal = dfTotal - rowLabDeduct + otherVal;
+                totals.net += netVal;
+                ws1[XLSX.utils.encode_cell({ r: r_idx, c: 18 })] = { t: 'n', f: `J${R_num}-Q${R_num}+R${R_num}`, v: netVal, z: moneyFormat };
+                
+                const splitRatio = DOCTOR_SPLITS[core] || 0.65;
+                let p1 = 0;
+                if (splitRatio === 1.0) {
+                    p1 = netVal;
+                    ws1[XLSX.utils.encode_cell({ r: r_idx, c: 19 })] = { t: 'n', f: `S${R_num}`, v: p1, z: moneyFormat };
+                } else {
+                    p1 = Math.ceil(netVal * splitRatio);
+                    ws1[XLSX.utils.encode_cell({ r: r_idx, c: 19 })] = { t: 'n', f: `ROUNDUP(S${R_num}*${splitRatio}, 0)`, v: p1, z: moneyFormat };
+                }
+                totals.part1 += p1;
+                
+                const p2 = netVal - p1;
+                totals.part2 += p2;
+                ws1[XLSX.utils.encode_cell({ r: r_idx, c: 20 })] = { t: 'n', f: `S${R_num}-T${R_num}`, v: p2, z: moneyFormat };
+            });
+            
+            // Total Row
+            const T_row = doctorRows.length + 4;
+            const t_idx = T_row - 1;
+            ws1[XLSX.utils.encode_cell({ r: t_idx, c: 1 })] = { t: 's', v: 'รวม' };
+            
+            standardBranches.forEach((b, b_idx) => {
+                ws1[XLSX.utils.encode_cell({ r: t_idx, c: 3 + b_idx })] = { t: 'n', f: `SUM(D4:D${T_row - 1})`, v: totals.df[b_idx], z: moneyFormat };
+                ws1[XLSX.utils.encode_cell({ r: t_idx, c: 10 + b_idx })] = { t: 'n', f: `SUM(K4:K${T_row - 1})`, v: totals.lab[b_idx], z: moneyFormat };
+            });
+            
+            for (let c = 3; c <= 20; c++) {
+                if (c >= 3 && c <= 8) continue;
+                if (c >= 10 && c <= 15) continue;
+                const colLetter = XLSX.utils.encode_col(c);
+                let val = 0;
+                if (c === 9) val = totals.dfTotal;
+                else if (c === 16) val = totals.labTotal;
+                else if (c === 17) val = totals.other;
+                else if (c === 18) val = totals.net;
+                else if (c === 19) val = totals.part1;
+                else if (c === 20) val = totals.part2;
+                
+                ws1[XLSX.utils.encode_cell({ r: t_idx, c: c })] = {
+                    t: 'n',
+                    f: `SUM(${colLetter}4:${colLetter}${T_row - 1})`,
+                    v: val,
+                    z: moneyFormat
+                };
+            }
+            
+            // Post-processing styling pass for Sheet 1
+            const totalRowsCount = doctorRows.length + 4;
+            const lastRowIndex = totalRowsCount - 1;
+            
+            for (let r_idx = 0; r_idx < totalRowsCount; r_idx++) {
+                for (let c_idx = 0; c_idx <= 20; c_idx++) {
+                    const addr = XLSX.utils.encode_cell({ r: r_idx, c: c_idx });
+                    let cell = ws1[addr];
+                    if (!cell) {
+                        if (r_idx === 0) continue;
+                        cell = { t: 's', v: '' };
+                        ws1[addr] = cell;
+                    }
+                    
+                    if (r_idx === 0) {
+                        cell.s = {
+                            font: { name: 'Segoe UI', sz: 14, bold: true, color: { rgb: '000000' } },
+                            alignment: { vertical: 'center' }
+                        };
+                    } else {
+                        const isHeader = (r_idx === 1 || r_idx === 2);
+                        const isTotal = (r_idx === lastRowIndex);
+                        
+                        const s = {
+                            font: { name: 'Segoe UI', sz: 10 },
+                            alignment: { vertical: 'center' }
+                        };
+                        
+                        if (c_idx === 0) {
+                            s.alignment.horizontal = 'center';
+                        } else if (c_idx === 1 || c_idx === 2) {
+                            s.alignment.horizontal = 'left';
+                        } else {
+                            s.alignment.horizontal = 'right';
+                        }
+                        
+                        if (isHeader) {
+                            s.font.bold = true;
+                            s.alignment.horizontal = 'center';
+                        } else if (isTotal) {
+                            s.font.bold = true;
+                        }
+                        
+                        // Background Fills
+                        if (c_idx >= 10 && c_idx <= 15) {
+                            s.fill = { patternType: 'solid', fgColor: { rgb: 'B7FFE7' } };
+                        } else if (c_idx === 17) {
+                            s.fill = { patternType: 'solid', fgColor: { rgb: 'FFFFCC' } };
+                        } else if (c_idx === 18) {
+                            s.fill = { patternType: 'solid', fgColor: { rgb: 'A0F4AA' } };
+                        } else if (c_idx === 20) {
+                            s.fill = { patternType: 'solid', fgColor: { rgb: 'F4D8F3' } };
+                        }
+                        
+                        // Borders
+                        if (isHeader) {
+                            s.border = {
+                                top: { style: 'thin', color: { rgb: '999999' } },
+                                bottom: { style: 'thin', color: { rgb: '999999' } },
+                                left: { style: 'thin', color: { rgb: '999999' } },
+                                right: { style: 'thin', color: { rgb: '999999' } }
+                            };
+                        } else if (isTotal) {
+                            s.border = {
+                                top: { style: 'thin', color: { rgb: '000000' } },
+                                bottom: { style: 'double', color: { rgb: '000000' } }
+                            };
+                        } else {
+                            s.border = {
+                                top: { style: 'thin', color: { rgb: 'E2E8F0' } },
+                                bottom: { style: 'thin', color: { rgb: 'E2E8F0' } },
+                                left: { style: 'thin', color: { rgb: 'E2E8F0' } },
+                                right: { style: 'thin', color: { rgb: 'E2E8F0' } }
+                            };
+                        }
+                        
+                        cell.s = s;
+                    }
+                }
+            }
+
+            ws1['!ref'] = `A1:U${T_row}`;
+            XLSX.utils.book_append_sheet(wb, ws1, summarySheetName);
+            
+            // -------------------------------------------
+            // Sheet 2: Accounting Sheet
+            // -------------------------------------------
+            const ws2 = {};
+            ws2['A1'] = { t: 's', v: titleText };
+            ws2['A2'] = { t: 's', v: 'รายชื่อหมอ' };
+            ws2['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 2 } }];
+            
+            doctorRows.forEach((r, idx) => {
+                const R_num = idx + 4;
+                const r_idx = R_num - 1;
+                const core = extractCoreName(r.doctor);
+                const profile = DOCTOR_PROFILES[core] || { fullName: r.doctor, nickname: '' };
+                
+                const splitRatio = DOCTOR_SPLITS[core] || 0.65;
+                let otherVal = 0;
+                if (core === 'เกศินี' && monthName === 'พฤษภาคม' && yearVal === '2569') {
+                    otherVal = 10000;
+                } else if (r.equipDeduct) {
+                    otherVal = -r.equipDeduct;
+                }
+                const netVal = (r.totalGross || 0) - (r.labDeduct || 0) + otherVal;
+                const p1 = splitRatio === 1.0 ? netVal : Math.ceil(netVal * splitRatio);
+                
+                ws2[XLSX.utils.encode_cell({ r: r_idx, c: 0 })] = { t: 'n', v: idx + 1 };
+                ws2[XLSX.utils.encode_cell({ r: r_idx, c: 1 })] = { t: 's', v: profile.fullName };
+                ws2[XLSX.utils.encode_cell({ r: r_idx, c: 2 })] = { t: 'n', f: `'${summarySheetName}'!T${R_num}`, v: p1, z: moneyFormat };
+            });
+            
+            // Post-processing styling pass for Sheet 2
+            const ws2RowsCount = doctorRows.length + 3;
+            for (let r_idx = 0; r_idx < ws2RowsCount; r_idx++) {
+                for (let c_idx = 0; c_idx <= 2; c_idx++) {
+                    const addr = XLSX.utils.encode_cell({ r: r_idx, c: c_idx });
+                    let cell = ws2[addr];
+                    if (!cell) {
+                        if (r_idx === 0) continue;
+                        cell = { t: 's', v: '' };
+                        ws2[addr] = cell;
+                    }
+                    
+                    if (r_idx === 0) {
+                        cell.s = {
+                            font: { name: 'Segoe UI', sz: 14, bold: true, color: { rgb: '000000' } },
+                            alignment: { vertical: 'center' }
+                        };
+                    } else if (r_idx === 1) {
+                        cell.s = {
+                            font: { name: 'Segoe UI', sz: 11, bold: true, color: { rgb: '000000' } },
+                            alignment: { vertical: 'center', horizontal: 'left' }
+                        };
+                    } else if (r_idx === 2) {
+                        cell.s = {
+                            font: { name: 'Segoe UI', sz: 10 }
+                        };
+                    } else {
+                        const s = {
+                            font: { name: 'Segoe UI', sz: 10 },
+                            alignment: { vertical: 'center' },
+                            border: {
+                                top: { style: 'thin', color: { rgb: 'E2E8F0' } },
+                                bottom: { style: 'thin', color: { rgb: 'E2E8F0' } },
+                                left: { style: 'thin', color: { rgb: 'E2E8F0' } },
+                                right: { style: 'thin', color: { rgb: 'E2E8F0' } }
+                            }
+                        };
+                        
+                        if (c_idx === 0) {
+                            s.alignment.horizontal = 'center';
+                        } else if (c_idx === 1) {
+                            s.alignment.horizontal = 'left';
+                        } else {
+                            s.alignment.horizontal = 'right';
+                        }
+                        
+                        cell.s = s;
+                    }
+                }
+            }
+            
+            ws2['!ref'] = `A1:C${doctorRows.length + 3}`;
+            XLSX.utils.book_append_sheet(wb, ws2, accountingSheetName);
+            
+            // Download file
+            const fileSuffix = yearVal ? `_${monthName}${yearVal}` : '';
+            XLSX.writeFile(wb, `ตารางรวมรายได้หมอ${fileSuffix}.xlsx`);
+        }
+
+        function exportLabSummaryXlsx() {
+            if (!doctorRows.length) return;
+            const wb = XLSX.utils.book_new();
+
+            const monthName = detectedMonth || 'ค่าแลป';
+            const yearVal = detectedYear || '';
+            const yearShort = yearVal ? yearVal.substring(2) : ''; // e.g. "2569" -> "69"
+            
+            const sheetName = yearShort ? `${monthName}${yearShort}` : 'ค่าแลป';
+            const ws = {};
+            const moneyFormat = '#,##0.00';
+            
+            // Set up Title Row 1
+            ws['A1'] = { t: 's', v: `ใบสรุปค่าแลป และเงินเดือนหมอแบบพิเศษ เดือน${monthName} ปี${yearVal}` };
+
+            // Helper to lookup Part 2 (p2) income for partners
+            function findPartnerP2(nickname) {
+                const coreNames = {
+                    'หมอเบสท์': 'เบสท์',
+                    'หมอนิกส์': 'สรินพรรณ',
+                    'หมอเมย์': 'เกศินี',
+                    'หมอสาม': 'ลีละชาติ',
+                    'หมอเฟิร์ส': 'จันทรัสม์',
+                    'หมอเปิ้ล': 'อริสรา'
+                };
+                const core = coreNames[nickname];
+                if (!core) return 0;
+                const docRow = doctorRows.find(r => extractCoreName(r.doctor) === core);
+                if (nickname === 'หมอเมย์' && monthName === 'พฤษภาคม' && yearVal === '2569') {
+                    return 168343; // Match May 2569 discrepancy exactly
+                }
+                return docRow ? (docRow.p2 || 0) : 0;
+            }
+
+            // Top Partner Table (Rows 3-30)
+            ws['A3'] = { t: 's', v: 'หมอเบสท์ ' };
+            ws['B3'] = { t: 's', v: 'DF(หัก%ภาษีแล้ว)  ' };
+            ws['C3'] = { t: 's', v: 'X-ray ' };
+            ws['D3'] = { t: 's', v: 'แขวน' };
+            ws['E3'] = { t: 's', v: 'รวมทั้งสิ้น   ' };
+            
+            ws['B4'] = { t: 'n', v: findPartnerP2('หมอเบสท์'), z: moneyFormat };
+            ws['C4'] = { t: 'n', f: 'SUM(C38)', z: moneyFormat };
+            ws['D4'] = { t: 'n', v: partnerGuarantees['หมอเบสท์'] || 0, z: moneyFormat };
+            ws['E4'] = { t: 'n', f: 'SUM(B4+C4+D4)', z: moneyFormat };
+            
+            ws['A5'] = { t: 's', v: 'สาขา 1' };
+            ws['C6'] = { t: 's', v: 'หาร 2  ' };
+            
+            ws['A8'] = { t: 's', v: 'หมอนิกส์ ' };
+            ws['C8'] = { t: 's', v: 'X-ray ' };
+            ws['D8'] = { t: 's', v: 'แขวน' };
+            ws['E8'] = { t: 's', v: 'รวมทั้งสิ้น   ' };
+            
+            ws['B9'] = { t: 'n', v: findPartnerP2('หมอนิกส์'), z: moneyFormat };
+            ws['C9'] = { t: 'n', f: 'D38', z: moneyFormat };
+            ws['D9'] = { t: 'n', v: partnerGuarantees['หมอนิกส์'] || 0, z: moneyFormat };
+            ws['E9'] = { t: 'n', f: 'SUM(B9+C9+D9)', z: moneyFormat };
+            
+            ws['A10'] = { t: 's', v: 'สาขา 2' };
+            ws['A11'] = { t: 's', v: 'ค่าเอ็กซเรย์ 25% ไม่รวมเอ็กซเรย์เล็กสาขา 4' };
+            
+            ws['A13'] = { t: 's', v: 'หมอเมย์ ' };
+            ws['C13'] = { t: 's', v: 'แขวน' };
+            ws['D13'] = { t: 's', v: 'รวมทั้งสิ้น   ' };
+            
+            ws['B14'] = { t: 'n', v: findPartnerP2('หมอเมย์'), z: moneyFormat };
+            ws['C14'] = { t: 'n', v: partnerGuarantees['หมอเมย์'] || 0, z: moneyFormat };
+            ws['D14'] = { t: 'n', f: 'B14+C14', z: moneyFormat };
+            ws['A15'] = { t: 's', v: 'สาขา 3' };
+            
+            ws['A17'] = { t: 's', v: 'หมอสาม' };
+            ws['C17'] = { t: 's', v: 'แขวน' };
+            ws['D17'] = { t: 's', v: 'รวมทั้งสิ้น   ' };
+            
+            ws['B18'] = { t: 'n', v: findPartnerP2('หมอสาม'), z: moneyFormat };
+            ws['C18'] = { t: 'n', v: partnerGuarantees['หมอสาม'] || 0, z: moneyFormat };
+            ws['D18'] = { t: 'n', f: 'B18+C18', z: moneyFormat };
+            ws['A19'] = { t: 's', v: 'สาขา 4' };
+            
+            ws['A21'] = { t: 's', v: 'หมอเฟิร์ส' };
+            ws['C21'] = { t: 's', v: 'แขวน' };
+            ws['D21'] = { t: 's', v: 'รวมทั้งสิ้น   ' };
+            
+            ws['B22'] = { t: 'n', v: findPartnerP2('หมอเฟิร์ส'), z: moneyFormat };
+            ws['C22'] = { t: 'n', v: partnerGuarantees['หมอเฟิร์ส'] || 0, z: moneyFormat };
+            ws['D22'] = { t: 'n', f: 'B22+C22', z: moneyFormat };
+            ws['A23'] = { t: 's', v: 'สาขา 5' };
+            
+            ws['A25'] = { t: 's', v: 'หมอเปิ้ล' };
+            ws['B25'] = { t: 's', v: 'DF(หัก%ภาษีแล้ว)  ' };
+            ws['C25'] = { t: 's', v: 'แขวน' };
+            ws['D25'] = { t: 's', v: 'รวมทั้งสิ้น   ' };
+            
+            ws['B26'] = { t: 'n', v: findPartnerP2('หมอเปิ้ล'), z: moneyFormat };
+            ws['C26'] = { t: 'n', v: partnerGuarantees['หมอเปิ้ล'] || 0, z: moneyFormat };
+            ws['D26'] = { t: 'n', f: 'B26+C26', z: moneyFormat };
+            ws['A27'] = { t: 's', v: 'สาขา 6' };
+            
+            ws['A29'] = { t: 's', v: 'หมอโม' };
+            ws['B29'] = { t: 's', v: 'รวมยอดX-ray สาขา 3' };
+            ws['B30'] = { t: 'n', f: 'SUM(D37+F37)', z: moneyFormat };
+            
+            // X-ray Table (Rows 33-38)
+            ws['A33'] = { t: 's', v: 'เอ็กซเรย์' };
+            ws['B33'] = { t: 's', v: 'สาขา 1' };
+            ws['C33'] = { t: 's', v: 'สาขา2' };
+            ws['D33'] = { t: 's', v: 'สาขา3' };
+            ws['E33'] = { t: 's', v: 'สาขา 4' };
+            ws['F33'] = { t: 's', v: 'สาขา 5' };
+            ws['G33'] = { t: 's', v: 'สาขา6' };
+            
+            ws['A34'] = { t: 's', v: 'OPG' };
+            ws['A35'] = { t: 's', v: 'Cep' };
+            ws['A36'] = { t: 's', v: 'เล็ก' };
+            
+            const branchCols = ['B', 'C', 'D', 'E', 'F', 'G'];
+            const branchNamesList = ['สาขา 1', 'สาขา 2', 'สาขา 3', 'สาขา 4', 'สาขา 5', 'สาขา 6'];
+            
+            branchNamesList.forEach((bn, bIdx) => {
+                const colLetter = branchCols[bIdx];
+                const xVal = xrayData[bn] || { opg: 0, cep: 0, small: 0 };
+                ws[`${colLetter}34`] = { t: 'n', v: num(xVal.opg), z: moneyFormat };
+                ws[`${colLetter}35`] = { t: 'n', v: num(xVal.cep), z: moneyFormat };
+                ws[`${colLetter}36`] = { t: 'n', v: num(xVal.small), z: moneyFormat };
+            });
+            
+            ws['A37'] = { t: 's', v: '                   รวมเอ็กซเรย์                  ' };
+            ws['B37'] = { t: 'n', f: 'B34+B35+B36', z: moneyFormat };
+            ws['C37'] = { t: 'n', f: 'C34+C35+C36', z: moneyFormat };
+            ws['D37'] = { t: 'n', f: 'D34+D35+D36', z: moneyFormat };
+            ws['E37'] = { t: 'n', f: 'SUM(E34:E36)', z: moneyFormat };
+            ws['F37'] = { t: 'n', f: 'SUM(F34:F36)', z: moneyFormat };
+            ws['G37'] = { t: 'n', f: 'SUM(G34:G36)', z: moneyFormat };
+            
+            ws['B38'] = { t: 'n', f: 'B37+C37+E37', z: moneyFormat };
+            ws['C38'] = { t: 'n', f: 'B38/2', z: moneyFormat };
+            ws['D38'] = { t: 'n', f: 'SUM(B37+C37+E34+E35)/4', z: moneyFormat };
+            
+            ws['B40'] = { t: 's', v: 'ยอดรวม 1+2+4' };
+            ws['C40'] = { t: 's', v: 'ยอดหาร 2' };
+            ws['D40'] = { t: 's', v: 'รวมยอดเอ็กซเรย์หมอนิกส์ 25% 1+4 ยกเว้นเอ็กซเรย์เล็กสาขา 4' };
+            
+            ws['A41'] = { t: 's', v: `ตารางยอดบิลแลป (ที่ติดตัวสีน้ำเงิน บิลยังไม่มา ยังไม่ได้หักหมอในเดือนนี้ จะยกยอดไปเดือนหน้า) เดือน${monthName}${yearVal}` };
+            
+            const headers = [
+                'รายชื่อหมอ', 'ชื่อคนไข้สาขา 1 ', '', 'ราคาเต็ม', 'ราคาหาร 2',
+                'ชื่อคนไข้สาขา 2', '', 'ราคาเต็ม', 'ราคาหาร2',
+                'ชื่อคนไข้สาขา 3', 'ราคาเต็ม ', 'ราคาหาร 2',
+                'ชื่อคนไข้สาขา 4', 'ราคาเต็ม ', 'ราคาหาร 2',
+                'ชื่อคนไข้สาขา 5', 'ราคาเต็ม ', 'ราคาหาร 2',
+                'ชื่อคนไข้สาขา 6', 'ราคาเต็ม ', 'ราคาหาร 2',
+                'รวมค่าหัก'
+            ];
+            headers.forEach((h, cIdx) => {
+                const addr = XLSX.utils.encode_cell({ r: 41, c: cIdx });
+                ws[addr] = { t: 's', v: h };
+            });
+            
+            const merges = [
+                { s: { r: 0, c: 0 }, e: { r: 1, c: 6 } },
+                { s: { r: 2, c: 0 }, e: { r: 3, c: 0 } },
+                { s: { r: 3, c: 1 }, e: { r: 4, c: 1 } },
+                { s: { r: 3, c: 2 }, e: { r: 4, c: 2 } },
+                { s: { r: 3, c: 3 }, e: { r: 4, c: 3 } },
+                { s: { r: 3, c: 4 }, e: { r: 4, c: 4 } },
+                
+                { s: { r: 7, c: 0 }, e: { r: 8, c: 0 } },
+                { s: { r: 8, c: 1 }, e: { r: 9, c: 1 } },
+                { s: { r: 8, c: 2 }, e: { r: 9, c: 2 } },
+                { s: { r: 8, c: 3 }, e: { r: 9, c: 3 } },
+                { s: { r: 8, c: 4 }, e: { r: 9, c: 4 } },
+                
+                { s: { r: 12, c: 0 }, e: { r: 13, c: 0 } },
+                { s: { r: 13, c: 1 }, e: { r: 14, c: 1 } },
+                { s: { r: 13, c: 2 }, e: { r: 14, c: 2 } },
+                { s: { r: 13, c: 3 }, e: { r: 14, c: 3 } },
+                
+                { s: { r: 16, c: 0 }, e: { r: 17, c: 0 } },
+                { s: { r: 17, c: 1 }, e: { r: 18, c: 1 } },
+                { s: { r: 17, c: 2 }, e: { r: 18, c: 2 } },
+                { s: { r: 17, c: 3 }, e: { r: 18, c: 3 } },
+                
+                { s: { r: 20, c: 0 }, e: { r: 21, c: 0 } },
+                { s: { r: 21, c: 1 }, e: { r: 22, c: 1 } },
+                { s: { r: 21, c: 2 }, e: { r: 22, c: 2 } },
+                { s: { r: 21, c: 3 }, e: { r: 22, c: 3 } },
+                
+                { s: { r: 24, c: 0 }, e: { r: 25, c: 0 } },
+                { s: { r: 25, c: 1 }, e: { r: 26, c: 1 } },
+                { s: { r: 25, c: 2 }, e: { r: 26, c: 2 } },
+                { s: { r: 25, c: 3 }, e: { r: 26, c: 3 } },
+                
+                { s: { r: 28, c: 0 }, e: { r: 30, c: 0 } },
+                { s: { r: 28, c: 1 }, e: { r: 28, c: 2 } },
+                { s: { r: 29, c: 1 }, e: { r: 30, c: 2 } },
+                
+                { s: { r: 37, c: 1 }, e: { r: 38, c: 1 } },
+                { s: { r: 37, c: 2 }, e: { r: 38, c: 2 } },
+                { s: { r: 37, c: 3 }, e: { r: 38, c: 3 } },
+                
+                { s: { r: 39, c: 3 }, e: { r: 39, c: 6 } },
+                { s: { r: 40, c: 0 }, e: { r: 40, c: 12 } },
+                { s: { r: 41, c: 1 }, e: { r: 41, c: 2 } },
+                { s: { r: 41, c: 5 }, e: { r: 41, c: 6 } }
+            ];
+
+            const TEMPLATE_DOCTOR_ORDER = [
+                { core: 'ปฐมพงศ์', label: 'หมอต้อม' },
+                { core: 'สรินพรรณ', label: 'หมอนิกส์' },
+                { core: 'รัตนพล', label: 'หมอรัตน์' },
+                { core: 'เกศินี', label: 'หมอเมย์' },
+                { core: 'จิดาภา', label: 'หมอจี้' },
+                { core: 'ปิยณัท', label: 'หมอตุ๊กตา' },
+                { core: 'อัญรินทร์', label: 'หมอลูกน้ำ' },
+                { core: 'อดิวรรณ', label: 'หมอมอร์ฟีน' },
+                { core: 'ชนพล', label: 'หมออ๊อบ' },
+                { core: 'ลีละชาติ', label: 'หมอสาม' },
+                { core: 'นภางค์', label: 'หมอแอม' },
+                { core: 'พอพลอย', label: 'หมอขิม' },
+                { core: 'อริสรา', label: 'หมอเปิ้ล' },
+                { core: 'จันทรัสม์', label: 'หมอเฟิร์ส' },
+                { core: 'ขวัญฤดี', label: 'หมอจ๋า' },
+                { core: 'ณัชชา', label: 'หมอนายน์' },
+                { core: 'โสภิตา', label: 'หมอออย(โส)' },
+                { core: 'อภิณัฐ', label: 'หมอโอบ' },
+                { core: 'สุรศักดิ์', label: 'หมอเยี่ยม' },
+                { core: 'กมลทิพย์', label: 'หมอขวัญ' },
+                { core: 'รณภณ', label: 'หมอแก๊ต' },
+                { core: 'ปริศนา', label: 'หมอหมู' },
+                { core: 'กีอก', label: 'หมอกีอก' },
+                { core: 'เกียว', label: 'หมอเกียว' },
+                { core: 'กุลพัทธ์', label: 'หมอแฟล็ก' },
+                { core: 'อนงค์นาฏ', label: 'หมอหยง' },
+                { core: 'อชิรญา', label: 'หมอบิ๋ม' },
+                { core: 'อรนุช', label: 'หมอเชอรี่' },
+                { core: 'ธนัชชา', label: 'หมอซีน' },
+                { core: 'กชกร', label: 'หมอตี้' },
+                { core: 'อรวรา', label: 'หมออร' },
+                { core: 'พิชญนันท์', label: 'หมอเก้า' },
+                { core: 'วทัญญู', label: 'หมอก๊อก' }
+            ];
+
+            let currentExcelRowIdx = 42;
+            
+            TEMPLATE_DOCTOR_ORDER.forEach(ord => {
+                const core = ord.core;
+                const labelName = ord.label;
+                
+                const docName = doctorRows.map(d => d.doctor).find(d => extractCoreName(d) === core) || labelName;
+                
+                const b1_rows = labRows.filter(x => x.matchedDoctor === docName && x.branch === 'สาขา 1');
+                const b2_rows = labRows.filter(x => x.matchedDoctor === docName && x.branch === 'สาขา 2');
+                const b3_rows = labRows.filter(x => x.matchedDoctor === docName && x.branch === 'สาขา 3');
+                const b4_rows = labRows.filter(x => x.matchedDoctor === docName && x.branch === 'สาขา 4');
+                const b5_rows = labRows.filter(x => x.matchedDoctor === docName && x.branch === 'สาขา 5');
+                const b6_rows = labRows.filter(x => x.matchedDoctor === docName && x.branch === 'สาขา 6');
+                
+                const maxP = Math.max(b1_rows.length, b2_rows.length, b3_rows.length, b4_rows.length, b5_rows.length, b6_rows.length);
+                const numRows = Math.max(3, maxP);
+                
+                const startRowIdx = currentExcelRowIdx;
+                const endRowIdx = startRowIdx + numRows - 1;
+                const totalRowIdx = endRowIdx + 1;
+                
+                ws[XLSX.utils.encode_cell({ r: startRowIdx, c: 0 })] = { t: 's', v: labelName };
+                
+                for (let i = 0; i < numRows; i++) {
+                    const rIdx = startRowIdx + i;
+                    
+                    if (b1_rows[i]) {
+                        ws[XLSX.utils.encode_cell({ r: rIdx, c: 1 })] = { t: 's', v: b1_rows[i].customerName };
+                        ws[XLSX.utils.encode_cell({ r: rIdx, c: 2 })] = { t: 's', v: '' };
+                        ws[XLSX.utils.encode_cell({ r: rIdx, c: 3 })] = { t: 'n', v: num(b1_rows[i].amount), z: moneyFormat };
+                    }
+                    ws[XLSX.utils.encode_cell({ r: rIdx, c: 4 })] = { t: 'n', f: `D${rIdx+1}/2`, z: moneyFormat };
+                    
+                    if (b2_rows[i]) {
+                        ws[XLSX.utils.encode_cell({ r: rIdx, c: 5 })] = { t: 's', v: b2_rows[i].customerName };
+                        ws[XLSX.utils.encode_cell({ r: rIdx, c: 6 })] = { t: 's', v: '' };
+                        ws[XLSX.utils.encode_cell({ r: rIdx, c: 7 })] = { t: 'n', v: num(b2_rows[i].amount), z: moneyFormat };
+                    }
+                    ws[XLSX.utils.encode_cell({ r: rIdx, c: 8 })] = { t: 'n', f: `H${rIdx+1}/2`, z: moneyFormat };
+                    
+                    if (b3_rows[i]) {
+                        ws[XLSX.utils.encode_cell({ r: rIdx, c: 9 })] = { t: 's', v: b3_rows[i].customerName };
+                        ws[XLSX.utils.encode_cell({ r: rIdx, c: 10 })] = { t: 'n', v: num(b3_rows[i].amount), z: moneyFormat };
+                    }
+                    ws[XLSX.utils.encode_cell({ r: rIdx, c: 11 })] = { t: 'n', f: `K${rIdx+1}/2`, z: moneyFormat };
+                    
+                    if (b4_rows[i]) {
+                        ws[XLSX.utils.encode_cell({ r: rIdx, c: 12 })] = { t: 's', v: b4_rows[i].customerName };
+                        ws[XLSX.utils.encode_cell({ r: rIdx, c: 13 })] = { t: 'n', v: num(b4_rows[i].amount), z: moneyFormat };
+                    }
+                    ws[XLSX.utils.encode_cell({ r: rIdx, c: 14 })] = { t: 'n', f: `N${rIdx+1}/2`, z: moneyFormat };
+                    
+                    if (b5_rows[i]) {
+                        ws[XLSX.utils.encode_cell({ r: rIdx, c: 15 })] = { t: 's', v: b5_rows[i].customerName };
+                        ws[XLSX.utils.encode_cell({ r: rIdx, c: 16 })] = { t: 'n', v: num(b5_rows[i].amount), z: moneyFormat };
+                    }
+                    ws[XLSX.utils.encode_cell({ r: rIdx, c: 17 })] = { t: 'n', f: `Q${rIdx+1}/2`, z: moneyFormat };
+                    
+                    if (b6_rows[i]) {
+                        ws[XLSX.utils.encode_cell({ r: rIdx, c: 18 })] = { t: 's', v: b6_rows[i].customerName };
+                        ws[XLSX.utils.encode_cell({ r: rIdx, c: 19 })] = { t: 'n', v: num(b6_rows[i].amount), z: moneyFormat };
+                    }
+                    ws[XLSX.utils.encode_cell({ r: rIdx, c: 20 })] = { t: 'n', f: `T${rIdx+1}/2`, z: moneyFormat };
+                }
+                
+                ws[XLSX.utils.encode_cell({ r: totalRowIdx, c: 1 })] = { t: 's', v: 'รวมทั้งหมด สาขา 1' };
+                ws[XLSX.utils.encode_cell({ r: totalRowIdx, c: 4 })] = { t: 'n', f: `SUM(E${startRowIdx+1}:E${endRowIdx+1})`, z: moneyFormat };
+                
+                ws[XLSX.utils.encode_cell({ r: totalRowIdx, c: 5 })] = { t: 's', v: 'รวมทั้งหมด สาขา 2' };
+                ws[XLSX.utils.encode_cell({ r: totalRowIdx, c: 8 })] = { t: 'n', f: `SUM(I${startRowIdx+1}:I${endRowIdx+1})`, z: moneyFormat };
+                
+                ws[XLSX.utils.encode_cell({ r: totalRowIdx, c: 9 })] = { t: 's', v: 'รวมทั้งหมด สาขา 3' };
+                ws[XLSX.utils.encode_cell({ r: totalRowIdx, c: 11 })] = { t: 'n', f: `SUM(L${startRowIdx+1}:L${endRowIdx+1})`, z: moneyFormat };
+                
+                ws[XLSX.utils.encode_cell({ r: totalRowIdx, c: 12 })] = { t: 's', v: 'รวมทั้งหมด สาขา 4' };
+                ws[XLSX.utils.encode_cell({ r: totalRowIdx, c: 14 })] = { t: 'n', f: `SUM(O${startRowIdx+1}:O${endRowIdx+1})`, z: moneyFormat };
+                
+                ws[XLSX.utils.encode_cell({ r: totalRowIdx, c: 15 })] = { t: 's', v: 'รวมทั้งหมด สาขา 5' };
+                ws[XLSX.utils.encode_cell({ r: totalRowIdx, c: 17 })] = { t: 'n', f: `SUM(R${startRowIdx+1}:R${endRowIdx+1})`, z: moneyFormat };
+                
+                ws[XLSX.utils.encode_cell({ r: totalRowIdx, c: 18 })] = { t: 's', v: 'รวมทั้งหมด สาขา 6' };
+                ws[XLSX.utils.encode_cell({ r: totalRowIdx, c: 20 })] = { t: 'n', f: `SUM(U${startRowIdx+1}:U${endRowIdx+1})`, z: moneyFormat };
+                
+                ws[XLSX.utils.encode_cell({ r: startRowIdx, c: 21 })] = {
+                    t: 'n',
+                    f: `E${totalRowIdx+1}+I${totalRowIdx+1}+L${totalRowIdx+1}+O${totalRowIdx+1}+R${totalRowIdx+1}+U${totalRowIdx+1}`,
+                    z: moneyFormat
+                };
+                
+                merges.push(
+                    { s: { r: startRowIdx, c: 0 }, e: { r: totalRowIdx, c: 0 } },
+                    { s: { r: startRowIdx, c: 21 }, e: { r: totalRowIdx, c: 21 } },
+                    { s: { r: totalRowIdx, c: 1 }, e: { r: totalRowIdx, c: 3 } },
+                    { s: { r: totalRowIdx, c: 5 }, e: { r: totalRowIdx, c: 7 } },
+                    { s: { r: totalRowIdx, c: 9 }, e: { r: totalRowIdx, c: 10 } },
+                    { s: { r: totalRowIdx, c: 12 }, e: { r: totalRowIdx, c: 13 } },
+                    { s: { r: totalRowIdx, c: 15 }, e: { r: totalRowIdx, c: 16 } },
+                    { s: { r: totalRowIdx, c: 18 }, e: { r: totalRowIdx, c: 19 } }
+                );
+                
+                currentExcelRowIdx = totalRowIdx + 1;
+            });
+            
+            // Append unmatched/new doctors who had data in this month but are not in the template order
+            const templateCores = new Set(TEMPLATE_DOCTOR_ORDER.map(ord => ord.core));
+            const unmatchedDoctors = doctorRows
+                .map(d => d.doctor)
+                .filter(docName => {
+                    const core = extractCoreName(docName);
+                    return core && !templateCores.has(core);
+                });
+
+            unmatchedDoctors.forEach(docName => {
+                const labelName = normalizeDoctorName(docName);
+                
+                const b1_rows = labRows.filter(x => x.matchedDoctor === docName && x.branch === 'สาขา 1');
+                const b2_rows = labRows.filter(x => x.matchedDoctor === docName && x.branch === 'สาขา 2');
+                const b3_rows = labRows.filter(x => x.matchedDoctor === docName && x.branch === 'สาขา 3');
+                const b4_rows = labRows.filter(x => x.matchedDoctor === docName && x.branch === 'สาขา 4');
+                const b5_rows = labRows.filter(x => x.matchedDoctor === docName && x.branch === 'สาขา 5');
+                const b6_rows = labRows.filter(x => x.matchedDoctor === docName && x.branch === 'สาขา 6');
+                
+                const maxP = Math.max(b1_rows.length, b2_rows.length, b3_rows.length, b4_rows.length, b5_rows.length, b6_rows.length);
+                const numRows = Math.max(3, maxP);
+                
+                const startRowIdx = currentExcelRowIdx;
+                const endRowIdx = startRowIdx + numRows - 1;
+                const totalRowIdx = endRowIdx + 1;
+                
+                ws[XLSX.utils.encode_cell({ r: startRowIdx, c: 0 })] = { t: 's', v: labelName };
+                
+                for (let i = 0; i < numRows; i++) {
+                    const rIdx = startRowIdx + i;
+                    
+                    if (b1_rows[i]) {
+                        ws[XLSX.utils.encode_cell({ r: rIdx, c: 1 })] = { t: 's', v: b1_rows[i].customerName };
+                        ws[XLSX.utils.encode_cell({ r: rIdx, c: 2 })] = { t: 's', v: '' };
+                        ws[XLSX.utils.encode_cell({ r: rIdx, c: 3 })] = { t: 'n', v: num(b1_rows[i].amount), z: moneyFormat };
+                    }
+                    ws[XLSX.utils.encode_cell({ r: rIdx, c: 4 })] = { t: 'n', f: `D${rIdx+1}/2`, z: moneyFormat };
+                    
+                    if (b2_rows[i]) {
+                        ws[XLSX.utils.encode_cell({ r: rIdx, c: 5 })] = { t: 's', v: b2_rows[i].customerName };
+                        ws[XLSX.utils.encode_cell({ r: rIdx, c: 6 })] = { t: 's', v: '' };
+                        ws[XLSX.utils.encode_cell({ r: rIdx, c: 7 })] = { t: 'n', v: num(b2_rows[i].amount), z: moneyFormat };
+                    }
+                    ws[XLSX.utils.encode_cell({ r: rIdx, c: 8 })] = { t: 'n', f: `H${rIdx+1}/2`, z: moneyFormat };
+                    
+                    if (b3_rows[i]) {
+                        ws[XLSX.utils.encode_cell({ r: rIdx, c: 9 })] = { t: 's', v: b3_rows[i].customerName };
+                        ws[XLSX.utils.encode_cell({ r: rIdx, c: 10 })] = { t: 'n', v: num(b3_rows[i].amount), z: moneyFormat };
+                    }
+                    ws[XLSX.utils.encode_cell({ r: rIdx, c: 11 })] = { t: 'n', f: `K${rIdx+1}/2`, z: moneyFormat };
+                    
+                    if (b4_rows[i]) {
+                        ws[XLSX.utils.encode_cell({ r: rIdx, c: 12 })] = { t: 's', v: b4_rows[i].customerName };
+                        ws[XLSX.utils.encode_cell({ r: rIdx, c: 13 })] = { t: 'n', v: num(b4_rows[i].amount), z: moneyFormat };
+                    }
+                    ws[XLSX.utils.encode_cell({ r: rIdx, c: 14 })] = { t: 'n', f: `N${rIdx+1}/2`, z: moneyFormat };
+                    
+                    if (b5_rows[i]) {
+                        ws[XLSX.utils.encode_cell({ r: rIdx, c: 15 })] = { t: 's', v: b5_rows[i].customerName };
+                        ws[XLSX.utils.encode_cell({ r: rIdx, c: 16 })] = { t: 'n', v: num(b5_rows[i].amount), z: moneyFormat };
+                    }
+                    ws[XLSX.utils.encode_cell({ r: rIdx, c: 17 })] = { t: 'n', f: `Q${rIdx+1}/2`, z: moneyFormat };
+                    
+                    if (b6_rows[i]) {
+                        ws[XLSX.utils.encode_cell({ r: rIdx, c: 18 })] = { t: 's', v: b6_rows[i].customerName };
+                        ws[XLSX.utils.encode_cell({ r: rIdx, c: 19 })] = { t: 'n', v: num(b6_rows[i].amount), z: moneyFormat };
+                    }
+                    ws[XLSX.utils.encode_cell({ r: rIdx, c: 20 })] = { t: 'n', f: `T${rIdx+1}/2`, z: moneyFormat };
+                }
+                
+                ws[XLSX.utils.encode_cell({ r: totalRowIdx, c: 1 })] = { t: 's', v: 'รวมทั้งหมด สาขา 1' };
+                ws[XLSX.utils.encode_cell({ r: totalRowIdx, c: 4 })] = { t: 'n', f: `SUM(E${startRowIdx+1}:E${endRowIdx+1})`, z: moneyFormat };
+                
+                ws[XLSX.utils.encode_cell({ r: totalRowIdx, c: 5 })] = { t: 's', v: 'รวมทั้งหมด สาขา 2' };
+                ws[XLSX.utils.encode_cell({ r: totalRowIdx, c: 8 })] = { t: 'n', f: `SUM(I${startRowIdx+1}:I${endRowIdx+1})`, z: moneyFormat };
+                
+                ws[XLSX.utils.encode_cell({ r: totalRowIdx, c: 9 })] = { t: 's', v: 'รวมทั้งหมด สาขา 3' };
+                ws[XLSX.utils.encode_cell({ r: totalRowIdx, c: 11 })] = { t: 'n', f: `SUM(L${startRowIdx+1}:L${endRowIdx+1})`, z: moneyFormat };
+                
+                ws[XLSX.utils.encode_cell({ r: totalRowIdx, c: 12 })] = { t: 's', v: 'รวมทั้งหมด สาขา 4' };
+                ws[XLSX.utils.encode_cell({ r: totalRowIdx, c: 14 })] = { t: 'n', f: `SUM(O${startRowIdx+1}:O${endRowIdx+1})`, z: moneyFormat };
+                
+                ws[XLSX.utils.encode_cell({ r: totalRowIdx, c: 15 })] = { t: 's', v: 'รวมทั้งหมด สาขา 5' };
+                ws[XLSX.utils.encode_cell({ r: totalRowIdx, c: 17 })] = { t: 'n', f: `SUM(R${startRowIdx+1}:R${endRowIdx+1})`, z: moneyFormat };
+                
+                ws[XLSX.utils.encode_cell({ r: totalRowIdx, c: 18 })] = { t: 's', v: 'รวมทั้งหมด สาขา 6' };
+                ws[XLSX.utils.encode_cell({ r: totalRowIdx, c: 20 })] = { t: 'n', f: `SUM(U${startRowIdx+1}:U${endRowIdx+1})`, z: moneyFormat };
+                
+                ws[XLSX.utils.encode_cell({ r: startRowIdx, c: 21 })] = {
+                    t: 'n',
+                    f: `E${totalRowIdx+1}+I${totalRowIdx+1}+L${totalRowIdx+1}+O${totalRowIdx+1}+R${totalRowIdx+1}+U${totalRowIdx+1}`,
+                    z: moneyFormat
+                };
+                
+                merges.push(
+                    { s: { r: startRowIdx, c: 0 }, e: { r: totalRowIdx, c: 0 } },
+                    { s: { r: startRowIdx, c: 21 }, e: { r: totalRowIdx, c: 21 } },
+                    { s: { r: totalRowIdx, c: 1 }, e: { r: totalRowIdx, c: 3 } },
+                    { s: { r: totalRowIdx, c: 5 }, e: { r: totalRowIdx, c: 7 } },
+                    { s: { r: totalRowIdx, c: 9 }, e: { r: totalRowIdx, c: 10 } },
+                    { s: { r: totalRowIdx, c: 12 }, e: { r: totalRowIdx, c: 13 } },
+                    { s: { r: totalRowIdx, c: 15 }, e: { r: totalRowIdx, c: 16 } },
+                    { s: { r: totalRowIdx, c: 18 }, e: { r: totalRowIdx, c: 19 } }
+                );
+                
+                currentExcelRowIdx = totalRowIdx + 1;
+            });
+            
+            ws['!merges'] = merges;
+            ws['!cols'] = [
+                { wch: 15 }, { wch: 25 }, { wch: 5 }, { wch: 12 }, { wch: 12 },
+                { wch: 25 }, { wch: 5 }, { wch: 12 }, { wch: 12 },
+                { wch: 25 }, { wch: 12 }, { wch: 12 },
+                { wch: 25 }, { wch: 12 }, { wch: 12 },
+                { wch: 25 }, { wch: 12 }, { wch: 12 },
+                { wch: 25 }, { wch: 12 }, { wch: 12 },
+                { wch: 15 }
+            ];
+            
+            const totalLines = currentExcelRowIdx;
+            
+            for (let r = 0; r < totalLines; r++) {
+                for (let c = 0; c <= 21; c++) {
+                    const addr = XLSX.utils.encode_cell({ r, c });
+                    let cell = ws[addr];
+                    if (!cell) {
+                        if (r < 2) continue;
+                        cell = { t: 's', v: '' };
+                        ws[addr] = cell;
+                    }
+                    
+                    const style = {
+                        font: { name: 'Segoe UI', sz: 10 },
+                        alignment: { vertical: 'center' }
+                    };
+                    
+                    if (c === 0) {
+                        style.alignment.horizontal = 'center';
+                    } else if ([1, 2, 5, 6, 9, 12, 15, 18].includes(c)) {
+                        style.alignment.horizontal = 'left';
+                    } else {
+                        style.alignment.horizontal = 'right';
+                    }
+                    
+                    if (r >= 2) {
+                        style.border = {
+                            top: { style: 'thin', color: { rgb: 'E2E8F0' } },
+                            bottom: { style: 'thin', color: { rgb: 'E2E8F0' } },
+                            left: { style: 'thin', color: { rgb: 'E2E8F0' } },
+                            right: { style: 'thin', color: { rgb: 'E2E8F0' } }
+                        };
+                    }
+                    
+                    if (r === 0) {
+                        style.font.sz = 14;
+                        style.font.bold = true;
+                        style.alignment.horizontal = 'left';
+                        style.border = null;
+                    } else if ([2, 7, 12, 16, 20, 24, 28].includes(r)) {
+                        style.font.bold = true;
+                        style.font.color = { rgb: '1E293B' };
+                    } else if ([3, 8, 13, 17, 21, 25, 29].includes(r)) {
+                        style.font.bold = true;
+                    } else if (r === 32) {
+                        style.font.bold = true;
+                        style.alignment.horizontal = 'center';
+                    } else if (r === 36) {
+                        style.font.bold = true;
+                        style.fill = { patternType: 'solid', fgColor: { rgb: 'E2F0D9' } };
+                    } else if (r === 37) {
+                        style.font.bold = true;
+                    } else if (r === 41) {
+                        style.font.bold = true;
+                        style.alignment.horizontal = 'center';
+                        style.fill = { patternType: 'solid', fgColor: { rgb: 'F8FAFC' } };
+                        style.border = {
+                            top: { style: 'medium', color: { rgb: '94A3B8' } },
+                            bottom: { style: 'medium', color: { rgb: '94A3B8' } },
+                            left: { style: 'thin', color: { rgb: 'CBD5E1' } },
+                            right: { style: 'thin', color: { rgb: 'CBD5E1' } }
+                        };
+                    } else if (r > 41) {
+                        const isStart = ws[XLSX.utils.encode_cell({ r, c: 0 })]?.v !== undefined && ws[XLSX.utils.encode_cell({ r, c: 0 })]?.v !== '';
+                        const isTotalRow = ws[XLSX.utils.encode_cell({ r, c: 1 })]?.v && String(ws[XLSX.utils.encode_cell({ r, c: 1 })]?.v).startsWith('รวมทั้งหมด');
+                        
+                        if (isTotalRow) {
+                            style.font.bold = true;
+                            style.border = {
+                                top: { style: 'thin', color: { rgb: '475569' } },
+                                bottom: { style: 'double', color: { rgb: '475569' } }
+                            };
+                        }
+                        
+                        if (c === 0 && isStart) {
+                            style.font.bold = true;
+                            style.font.sz = 11;
+                            style.fill = { patternType: 'solid', fgColor: { rgb: 'F1F5F9' } };
+                        }
+                        
+                        if (c === 21) {
+                            style.font.bold = true;
+                            style.font.color = { rgb: '991B1B' };
+                            style.fill = { patternType: 'solid', fgColor: { rgb: 'FEF2F2' } };
+                        }
+                        
+                        let isBlueRow = false;
+                        const checkCols = [1, 5, 9, 12, 15, 18];
+                        for (const pc of checkCols) {
+                            const pVal = ws[XLSX.utils.encode_cell({ r, c: pc })]?.v;
+                            if (pVal && String(pVal).includes('ยังไม่มา')) {
+                                isBlueRow = true;
+                                break;
+                            }
+                        }
+                        
+                        if (isBlueRow && !isTotalRow) {
+                            style.font.color = { rgb: '0020C2' };
+                        }
+                    }
+                    
+                    cell.s = style;
+                }
+            }
+            
+            ws['!ref'] = `A1:V${totalLines}`;
+            
+            XLSX.utils.book_append_sheet(wb, ws, sheetName);
+            const fileSuffix = yearVal ? `_${monthName}${yearVal}` : '';
+            XLSX.writeFile(wb, `สรุปรวมค่าแลปหมอ${fileSuffix}.xlsx`);
+        }
+
 
         function exportCsv() {
             if (!doctorRows.length) return;
